@@ -8,3 +8,5 @@ TaskMaster to prosta aplikacja SaaS do zarządzania projektami i zadaniami. Uży
 - **Backend:** Bun + Prisma + REST API
 - **Baza danych:** PostgreSQL / SQLite
 - **Uwierzytelnianie:** JWT + role użytkowników
+
+![Homepage](./homepage.png)
