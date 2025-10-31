@@ -1,0 +1,23 @@
+{
+  "name": "taskmaster-backend",
+  "version": "1.0.0",
+  "description": "TaskMaster backend API",
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "bun run src/server.ts",
+    "start": "bun run src/server.ts",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.7.1",
+    "elysia": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "prisma": "^5.7.1",
+    "typescript": "^5.3.3"
+  }
+}
