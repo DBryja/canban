@@ -1,3 +1,7 @@
+# Kod dostępny pod:
+
+https://github.com/DBryja/canban/tree/backend-base/backend/src
+
 ## Przykładowy Route API
 
 ```ts
@@ -133,6 +137,6 @@ export function guardApi(
 }
 ```
 
-![api-success](./api-success.jpg)
-![api-error-auht](./api-error.jpg)
-![api-error-id](./api-error-id.jpg)
+![api-success](https://github.com/DBryja/canban/tree/backend-base/labs/lab2/api-success.jpg)
+![api-error-auht](https://github.com/DBryja/canban/tree/backend-base/labs/lab2/api-error.jpg)
+![api-error-id](https://github.com/DBryja/canban/tree/backend-base/labs/lab2/api-error-id.jpg)
