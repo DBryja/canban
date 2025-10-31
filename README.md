@@ -9,7 +9,7 @@ TaskMaster to prosta aplikacja SaaS do zarządzania projektami i zadaniami. Uży
 - **Baza danych:** PostgreSQL (Docker)
 - **Uwierzytelnianie:** JWT + role użytkowników (do dodania)
 
-![Homepage](./homepage.png)
+![Homepage](./labs/lab1/homepage.png)
 
 ## 🚀 Uruchomienie
 
