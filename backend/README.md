@@ -39,3 +39,6 @@ API będzie dostępne na `http://localhost:3001`
 - `GET /` - Strona główna API
 - `GET /health` - Health check
 - `GET /health/db` - Health check bazy danych
+
+- GET "/api/projects?api-secret=SECRET" http://localhost:3001/api/projects?api-secret=SECRET
+- GET "/api/projects?secret=SECRET" http://localhost:3001/api/projects?secret=SECRET
