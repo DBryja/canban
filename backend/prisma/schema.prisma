@@ -7,12 +7,108 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Przykładowe tabele - do rozbudowy w przyszłości
+// User model
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String     @id @default(cuid())
+  email     String     @unique
   name      String?
+  password  String? // Will be used for JWT auth later
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Relations
+  teamRoles UserRole[] // User's roles in different teams
+  createdTasks Task[]  @relation("TaskCreator")
+}
+
+// Team model
+model Team {
+  id        String     @id @default(cuid())
+  name      String
+  description String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Relations
+  members   UserRole[] // Team members with roles
+  projects  Project[]
+}
+
+// UserRole - junction table for User-Team relationship with role
+enum Role {
+  TeamLeader
+  TeamMember
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  role      Role     @default(TeamMember)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId]) // User can have only one role per team
+  @@index([userId])
+  @@index([teamId])
+}
+
+// Project model
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  teamId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  @@index([teamId])
+}
+
+// TaskTag model
+model TaskTag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String?  // Optional color for UI
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tasks        Task[]          @relation("TaskTags")
+  mainTagTasks Task[]          @relation("TaskMainTag")
+
+  @@index([name])
+}
+
+// Task model
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  projectId   String
+  creatorId   String
+  mainTagId   String?   // Main tag for grouping
+  date        DateTime? // Optional date
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator     User      @relation("TaskCreator", fields: [creatorId], references: [id])
+  mainTag     TaskTag?  @relation("TaskMainTag", fields: [mainTagId], references: [id])
+  tags        TaskTag[] @relation("TaskTags")
+
+  @@index([projectId])
+  @@index([creatorId])
+  @@index([mainTagId])
+  @@index([date])
 }
 
