@@ -1,8 +1,10 @@
-import { Elysia } from "elysia";
-
 const API_SECRET = process.env.API_SECRET || "SECRET";
 
-export const authMiddleware = new Elysia().onBeforeHandle(({ headers, query, set }) => {
+export function guardApi(
+  headers: Record<string, string | undefined>,
+  query: Record<string, string> | undefined,
+  set: { status?: number | string }
+): { error: string; message: string } | undefined {
   // Get secret from various sources
   const headerSecret = headers["x-api-secret"] || headers["authorization"]?.replace("Bearer ", "");
   const querySecret = query?.["api-secret"] || query?.["secret"];
@@ -16,4 +18,6 @@ export const authMiddleware = new Elysia().onBeforeHandle(({ headers, query, set
       message: "Invalid or missing API secret",
     };
   }
-});
+
+  return undefined;
+}

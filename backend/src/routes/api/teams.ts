@@ -1,9 +1,12 @@
 import { Elysia } from "elysia";
 import { prisma } from "../../lib/prisma";
-import { authMiddleware } from "../../middleware/auth";
+import { guardApi } from "../../middleware/auth";
 
 export const teamRoutes = new Elysia({ prefix: "/teams" })
-  .use(authMiddleware)
+  .onBeforeHandle(({ headers, query, set }) => {
+    const error = guardApi(headers, query, set);
+    if (error) return error;
+  })
   .get("/", async () => {
     try {
       const teams = await prisma.team.findMany({
