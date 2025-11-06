@@ -69,7 +69,7 @@ canban/
 │   ├── src/
 │   ├── prisma/
 │   └── package.json
-├── frontend/         # Frontend (React + Vite + TypeScript)
+├── frontend/         # Frontend (NextJS)
 │   ├── src/
 │   └── package.json
 ├── docker-compose.yml
