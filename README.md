@@ -87,7 +87,7 @@ canban/
 - **Bun**: Szybki runtime JavaScript z wbudowanym bundlerem, test runnerem i package managerem
 - **Elysia**: Nowoczesny, szybki framework dla Bun z TypeScript-first approach
 - **Prisma**: Type-safe ORM z automatycznymi migracjami i doskonałym wsparciem dla TypeScript
-- **React + Vite**: Szybki build tool z HMR dla szybkiego developmentu
+- **NextJS**: Framework z Reacta, pozwalajacy na łatwy routing i ssg + ssr
 - **shadcn/ui**: Komponenty UI oparte na Radix UI z pełną kontrolą nad kodem
 - **PostgreSQL**: Zaawansowana relacyjna baza danych z doskonałą wydajnością
 
