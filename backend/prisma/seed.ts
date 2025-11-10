@@ -1,64 +1,74 @@
 import { PrismaClient, Role } from "@prisma/client";
+import { hashPassword } from "../src/lib/auth";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("🌱 Seeding database...");
 
-  // Create users
+  // Create users with passwords
+  const defaultPassword = await hashPassword("password123");
   const users = await Promise.all([
     prisma.user.create({
       data: {
         email: "alice@example.com",
         name: "Alice Johnson",
+        password: defaultPassword,
       },
     }),
     prisma.user.create({
       data: {
         email: "bob@example.com",
         name: "Bob Smith",
+        password: defaultPassword,
       },
     }),
     prisma.user.create({
       data: {
         email: "charlie@example.com",
         name: "Charlie Brown",
+        password: defaultPassword,
       },
     }),
     prisma.user.create({
       data: {
         email: "diana@example.com",
         name: "Diana Prince",
+        password: defaultPassword,
       },
     }),
     prisma.user.create({
       data: {
         email: "eve@example.com",
         name: "Eve Adams",
+        password: defaultPassword,
       },
     }),
   ]);
 
   console.log(`✅ Created ${users.length} users`);
 
-  // Create teams
+  // Create teams with owners
   const teams = await Promise.all([
     prisma.team.create({
       data: {
         name: "Development Team",
         description: "Main development team",
+        ownerId: users[0].id,
       },
     }),
     prisma.team.create({
       data: {
         name: "Design Team",
         description: "UI/UX design team",
+        ownerId: users[3].id,
       },
     }),
     prisma.team.create({
       data: {
         name: "Marketing Team",
         description: "Marketing and communication",
+        ownerId: users[4].id,
       },
     }),
   ]);
@@ -72,7 +82,7 @@ async function main() {
       data: {
         userId: users[0].id,
         teamId: teams[0].id,
-        role: Role.TeamLeader,
+        role: Role.TeamOwner,
       },
     }),
     prisma.userRole.create({
@@ -94,7 +104,7 @@ async function main() {
       data: {
         userId: users[3].id,
         teamId: teams[1].id,
-        role: Role.TeamLeader,
+        role: Role.TeamOwner,
       },
     }),
     prisma.userRole.create({
@@ -109,7 +119,7 @@ async function main() {
       data: {
         userId: users[4].id,
         teamId: teams[2].id,
-        role: Role.TeamLeader,
+        role: Role.TeamOwner,
       },
     }),
   ]);

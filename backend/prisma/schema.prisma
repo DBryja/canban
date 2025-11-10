@@ -12,32 +12,38 @@ model User {
   id        String     @id @default(cuid())
   email     String     @unique
   name      String?
-  password  String? // Will be used for JWT auth later
+  password  String     // Hashed password for JWT auth
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
   // Relations
   teamRoles UserRole[] // User's roles in different teams
+  ownedTeam Team?      // User can own only one team
   createdTasks Task[]  @relation("TaskCreator")
 }
 
 // Team model
 model Team {
-  id        String     @id @default(cuid())
-  name      String
+  id          String     @id @default(cuid())
+  name        String
   description String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  ownerId     String     @unique // One owner per team
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   // Relations
-  members   UserRole[] // Team members with roles
-  projects  Project[]
+  owner       User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members     UserRole[] // Team members with roles
+  projects    Project[]
+  invitations TeamInvitation[]
+
+  @@index([ownerId])
 }
 
 // UserRole - junction table for User-Team relationship with role
 enum Role {
-  TeamLeader
-  TeamMember
+  TeamOwner   // Team owner (only one per team)
+  TeamMember  // Regular team member
 }
 
 model UserRole {
@@ -110,5 +116,23 @@ model Task {
   @@index([creatorId])
   @@index([mainTagId])
   @@index([date])
+}
+
+// TeamInvitation model - for team invitation links with expiration
+model TeamInvitation {
+  id        String   @id @default(cuid())
+  token     String   @unique // Unique invitation token
+  teamId    String
+  expiresAt DateTime // Expiration time
+  used      Boolean  @default(false) // Whether invitation was used
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([teamId])
+  @@index([expiresAt])
 }
 

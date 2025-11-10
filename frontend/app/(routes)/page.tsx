@@ -15,6 +15,9 @@ export default function Home() {
 
           <div className="mt-8 bg-card rounded-lg border p-6">
             <ul className="list-disc list-inside space-y-2 text-muted-foreground ">
+              <li>
+                <Link href='/auth-test'>Test Autentykacji</Link>
+              </li>
               <li >
                 <Link href='{{api}}/projects' target='_blank'>Projekty</Link>
               </li>
