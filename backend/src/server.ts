@@ -8,18 +8,11 @@ const app = new Elysia()
     set.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH";
     set.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
   })
-  .onRequest(({ set }) => {
+  .options("*", ({ set }) => {
     set.headers["Access-Control-Allow-Origin"] = "*";
-  })
-  .options("*", () => {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    });
+    set.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH";
+    set.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+    return new Response(null, { status: 204 });
   });
 
 // Health check endpoints
