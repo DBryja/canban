@@ -298,7 +298,7 @@ export default function ProjectManagePage() {
 
   return (
     <ProtectedRoute>
-      <div className="space-y-4">
+      <div className="space-y-4 max-w-screen-sm">
         <div className="flex flex-col items-start gap-8">
           <div>
             <h1 className="text-3xl font-bold">Zarządzanie użytkownikami</h1>
