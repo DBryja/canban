@@ -1,7 +1,7 @@
 "use client";
 
-import { SidebarProvider } from "@/app/components/ui/sidebar";
 import { AppSidebar } from "@/app/components/AppSidebar";
+import { AppSidebarProvider } from "@/app/components/AppSidebar/context";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
 
 export default function DashboardLayout({
@@ -11,12 +11,12 @@ export default function DashboardLayout({
 }) {
   return (
     <ProtectedRoute>
-      <SidebarProvider defaultOpen={true}>
+      <AppSidebarProvider>
         <div className="flex h-screen sticky top-0">
           <AppSidebar />
         </div>
         <main className="flex-1 overflow-auto p-4">{children}</main>
-      </SidebarProvider>
+      </AppSidebarProvider>
     </ProtectedRoute>
   );
 }

@@ -12,38 +12,14 @@ import {
   CardTitle,
 } from "@/app/components/ui/card";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
-
-interface Project {
-  id: string;
-  name: string;
-  description: string | null;
-  creatorId: string;
-  createdAt: string;
-  updatedAt: string;
-  creator?: {
-    id: string;
-    name: string | null;
-    email: string;
-  };
-  tasks?: Array<{
-    id: string;
-    title: string;
-    description: string | null;
-  }>;
-}
-
-// Helper function to create slug from project name
-function createSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
+import { useAppSidebar } from "@/app/components/AppSidebar/context";
+import type { Project } from "@/app/components/AppSidebar/utils";
 
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { findProjectBySlug } = useAppSidebar();
   const projectSlug = params["project-slug"] as string;
 
   const [project, setProject] = useState<Project | null>(null);
@@ -58,16 +34,8 @@ export default function ProjectPage() {
         setLoading(true);
         setError(null);
 
-        // First, get all projects to find the one matching the slug
-        const projectsResponse = await api.get<{ projects: Project[] }>(
-          "/projects"
-        );
-        const projects = projectsResponse.data.projects;
-
-        // Find project by slug or ID
-        const foundProject = projects.find(
-          (p) => createSlug(p.name) === projectSlug || p.id === projectSlug
-        );
+        // Find project by slug using utility from AppSidebar
+        const foundProject = findProjectBySlug(projectSlug);
 
         if (!foundProject) {
           setError("Projekt nie został znaleziony");
@@ -94,7 +62,7 @@ export default function ProjectPage() {
     };
 
     fetchProject();
-  }, [projectSlug, user]);
+  }, [projectSlug, user, findProjectBySlug]);
 
   if (loading) {
     return (
@@ -153,34 +121,38 @@ export default function ProjectPage() {
               </label>
               <p className="text-sm">{project.id}</p>
             </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">
-                Utworzony
-              </label>
-              <p className="text-sm">
-                {new Date(project.createdAt).toLocaleDateString("pl-PL", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">
-                Ostatnia aktualizacja
-              </label>
-              <p className="text-sm">
-                {new Date(project.updatedAt).toLocaleDateString("pl-PL", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            </div>
+            {project.createdAt && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Utworzony
+                </label>
+                <p className="text-sm">
+                  {new Date(project.createdAt).toLocaleDateString("pl-PL", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+            )}
+            {project.updatedAt && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Ostatnia aktualizacja
+                </label>
+                <p className="text-sm">
+                  {new Date(project.updatedAt).toLocaleDateString("pl-PL", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
