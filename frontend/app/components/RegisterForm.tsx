@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Input } from "@/app/components/ui/input";
+import { Button } from "@/app/components/ui/button";
 
 export default function RegisterForm() {
   const [email, setEmail] = useState("");
@@ -12,6 +14,7 @@ export default function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,9 +23,13 @@ export default function RegisterForm() {
 
     try {
       await register(email, password, name || undefined);
-      router.push("/");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Nie udało się zarejestrować");
+      const redirect = searchParams.get("redirect");
+      router.replace(redirect || "/dashboard");
+    } catch (err: unknown) {
+      const errorMessage =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Nie udało się zarejestrować";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -30,65 +37,57 @@ export default function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium mb-1">
+      <div className="space-y-2">
+        <label htmlFor="name" className="text-sm font-medium">
           Imię (opcjonalne)
         </label>
-        <input
+        <Input
           id="name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Jan Kowalski"
         />
       </div>
 
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium mb-1">
+      <div className="space-y-2">
+        <label htmlFor="email" className="text-sm font-medium">
           Email
         </label>
-        <input
+        <Input
           id="email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="twoj@email.com"
         />
       </div>
 
-      <div>
-        <label htmlFor="password" className="block text-sm font-medium mb-1">
+      <div className="space-y-2">
+        <label htmlFor="password" className="text-sm font-medium">
           Hasło (min. 6 znaków)
         </label>
-        <input
+        <Input
           id="password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={6}
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="••••••••"
         />
       </div>
 
       {error && (
-        <div className="text-red-600 text-sm bg-red-50 p-3 rounded-md">
+        <div className="text-destructive text-sm bg-destructive/10 p-3 rounded-md border border-destructive/20">
           {error}
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+      <Button type="submit" disabled={loading} className="w-full">
         {loading ? "Rejestracja..." : "Zarejestruj się"}
-      </button>
+      </Button>
     </form>
   );
 }
-

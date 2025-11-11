@@ -37,7 +37,7 @@ export async function proxy(request: NextRequest) {
       });
 
       if (response.ok) {
-        return NextResponse.redirect(new URL("/", request.url));
+        return NextResponse.redirect(new URL("/dashboard", request.url));
       }
     } catch {
       // Token invalid, clear cookie and allow access to auth page
@@ -89,5 +89,3 @@ export const config = {
     "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 };
-
-

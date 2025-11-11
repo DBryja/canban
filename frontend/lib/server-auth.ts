@@ -48,4 +48,3 @@ export async function isAuthenticated(): Promise<boolean> {
   const user = await getServerUser();
   return user !== null;
 }
-

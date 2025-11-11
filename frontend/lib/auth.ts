@@ -4,6 +4,7 @@ export interface User {
   id: string;
   email: string;
   name: string | null;
+  isAdmin?: boolean;
   createdAt: string;
 }
 
@@ -25,7 +26,10 @@ export interface AuthError {
 }
 
 // Login user
-export async function login(email: string, password: string): Promise<LoginResponse> {
+export async function login(
+  email: string,
+  password: string
+): Promise<LoginResponse> {
   const response = await api.post<LoginResponse>("/auth/login", {
     email,
     password,
@@ -48,8 +52,12 @@ export async function register(
 }
 
 // Get current user
-export async function getCurrentUser(): Promise<{ user: User & { ownedTeam?: any; teamRoles?: any[] } }> {
-  const response = await api.get<{ user: User & { ownedTeam?: any; teamRoles?: any[] } }>("/auth/me");
+export async function getCurrentUser(): Promise<{
+  user: User & { isAdmin?: boolean; projectMembers?: any[] };
+}> {
+  const response = await api.get<{
+    user: User & { isAdmin?: boolean; projectMembers?: any[] };
+  }>("/auth/me");
   return response.data;
 }
 
@@ -59,7 +67,7 @@ export function setAuthData(token: string, user: User): void {
     // Store in localStorage for client-side access
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(user));
-    
+
     // Store in cookie for server-side middleware
     document.cookie = `token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`; // 7 days
   }
@@ -71,12 +79,12 @@ export function getAuthData(): { token: string | null; user: User | null } {
     // Try localStorage first (faster)
     const token = localStorage.getItem("token");
     const userStr = localStorage.getItem("user");
-    
+
     if (token && userStr) {
       const user = JSON.parse(userStr);
       return { token, user };
     }
-    
+
     // Fallback to cookies
     const cookies = document.cookie.split(";");
     const tokenCookie = cookies.find((c) => c.trim().startsWith("token="));
@@ -93,7 +101,7 @@ export function clearAuthData(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    
+
     // Clear cookie
     document.cookie = "token=; path=/; max-age=0";
   }

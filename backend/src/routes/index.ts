@@ -2,7 +2,6 @@ import { Elysia } from "elysia";
 import { authRoutes } from "./api/auth";
 import { invitationRoutes } from "./api/invitations";
 import { projectRoutes } from "./api/projects";
-import { teamRoutes } from "./api/teams";
 
 export const routes = new Elysia({ prefix: "/api" })
   .get("/", () => {
@@ -10,5 +9,4 @@ export const routes = new Elysia({ prefix: "/api" })
   })
   .use(authRoutes)
   .use(invitationRoutes)
-  .use(projectRoutes)
-  .use(teamRoutes);
+  .use(projectRoutes);

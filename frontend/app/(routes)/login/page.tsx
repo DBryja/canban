@@ -18,7 +18,7 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">Nie masz konta? </span>
-            <Link href="/register" className="text-blue-600 hover:underline">
+            <Link href="/register" className="text-primary hover:underline">
               Zarejestruj się
             </Link>
           </div>
@@ -27,4 +27,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

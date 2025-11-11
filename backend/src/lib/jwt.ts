@@ -1,6 +1,7 @@
 import { jwt } from "@elysiajs/jwt";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const JWT_SECRET =
+  process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
 export const jwtPlugin = jwt({
   name: "jwt",
@@ -11,4 +12,3 @@ export interface JWTPayload {
   userId: string;
   email: string;
 }
-

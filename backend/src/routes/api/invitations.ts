@@ -2,7 +2,7 @@ import { Elysia, t } from "elysia";
 import { prisma } from "../../lib/prisma";
 import { jwtPlugin } from "../../lib/jwt";
 import { requireAuth } from "../../middleware/auth";
-import { Role } from "@prisma/client";
+import { ProjectRole } from "@prisma/client";
 import { randomBytes } from "crypto";
 
 // Generate unique invitation token
@@ -12,7 +12,7 @@ function generateInvitationToken(): string {
 
 export const invitationRoutes = new Elysia({ prefix: "/invitations" })
   .use(jwtPlugin)
-  // Create invitation link for a team (only team owner)
+  // Create invitation link for a project (only admins)
   .post(
     "/",
     async ({ body, jwt, headers, set }) => {
@@ -22,29 +22,32 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
       }
       const { userId } = authResult;
 
-      const { teamId, expiresInHours } = body;
+      // Check if user is admin
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true },
+      });
 
-      // Verify user owns the team
-      const team = await prisma.team.findUnique({
-        where: { id: teamId },
-        include: {
-          owner: true,
-        },
-      } as any);
-
-      if (!team) {
-        set.status = 404;
-        return {
-          error: "Not Found",
-          message: "Team not found",
-        };
-      }
-
-      if (team.ownerId !== userId) {
+      if (!user || !user.isAdmin) {
         set.status = 403;
         return {
           error: "Forbidden",
-          message: "Only team owner can create invitations",
+          message: "Only admins can create invitations",
+        };
+      }
+
+      const { projectId, role, expiresInHours } = body;
+
+      // Verify project exists and user created it (or is admin)
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+      });
+
+      if (!project) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Project not found",
         };
       }
 
@@ -57,14 +60,15 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
       const token = generateInvitationToken();
 
       try {
-        const invitation = await prisma.teamInvitation.create({
+        const invitation = await prisma.projectInvitation.create({
           data: {
             token,
-            teamId,
+            projectId,
+            role: role || ProjectRole.Guest,
             expiresAt,
           },
           include: {
-            team: {
+            project: {
               select: {
                 id: true,
                 name: true,
@@ -78,7 +82,8 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
           invitation: {
             id: invitation.id,
             token: invitation.token,
-            team: invitation.team,
+            project: invitation.project,
+            role: invitation.role,
             expiresAt: invitation.expiresAt,
             createdAt: invitation.createdAt,
           },
@@ -95,7 +100,10 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
     },
     {
       body: t.Object({
-        teamId: t.String(),
+        projectId: t.String(),
+        role: t.Optional(
+          t.Union([t.Literal("Guest"), t.Literal("Maintainer")])
+        ),
         expiresInHours: t.Optional(t.Number({ minimum: 1, maximum: 168 })), // Max 7 days
       }),
     }
@@ -105,15 +113,15 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
     const { token } = params;
 
     try {
-      const invitation = await prisma.teamInvitation.findUnique({
+      const invitation = await prisma.projectInvitation.findUnique({
         where: { token },
         include: {
-          team: {
+          project: {
             select: {
               id: true,
               name: true,
               description: true,
-              owner: {
+              creator: {
                 select: {
                   id: true,
                   email: true,
@@ -141,7 +149,8 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
           message: "Invitation has expired",
           invitation: {
             id: invitation.id,
-            team: invitation.team,
+            project: invitation.project,
+            role: invitation.role,
             expiresAt: invitation.expiresAt,
           },
         };
@@ -155,7 +164,8 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
           message: "Invitation has already been used",
           invitation: {
             id: invitation.id,
-            team: invitation.team,
+            project: invitation.project,
+            role: invitation.role,
             expiresAt: invitation.expiresAt,
           },
         };
@@ -165,7 +175,8 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
         invitation: {
           id: invitation.id,
           token: invitation.token,
-          team: invitation.team,
+          project: invitation.project,
+          role: invitation.role,
           expiresAt: invitation.expiresAt,
           createdAt: invitation.createdAt,
         },
@@ -179,165 +190,173 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
     }
   })
   // Accept invitation (only for authenticated users)
-  .post(
-    "/:token/accept",
-    async ({ params, jwt, headers, set }) => {
-      const authResult = await requireAuth(jwt, headers, set);
-      if ("error" in authResult) {
-        return authResult;
-      }
-      const { userId } = authResult;
-
-      const { token } = params;
-
-      try {
-        // Find invitation
-        const invitation = await prisma.teamInvitation.findUnique({
-          where: { token },
-          include: {
-            team: true,
-          },
-        });
-
-        if (!invitation) {
-          set.status = 404;
-          return {
-            error: "Not Found",
-            message: "Invitation not found",
-          };
-        }
-
-        // Check if invitation is expired
-        if (new Date() > invitation.expiresAt) {
-          set.status = 410;
-          return {
-            error: "Gone",
-            message: "Invitation has expired",
-          };
-        }
-
-        // Check if invitation was already used
-        if (invitation.used) {
-          set.status = 409;
-          return {
-            error: "Conflict",
-            message: "Invitation has already been used",
-          };
-        }
-
-        // Check if user is already a member of the team
-        const existingMember = await prisma.userRole.findUnique({
-          where: {
-            userId_teamId: {
-              userId,
-              teamId: invitation.teamId,
-            },
-          },
-        });
-
-        if (existingMember) {
-          set.status = 409;
-          return {
-            error: "Conflict",
-            message: "You are already a member of this team",
-          };
-        }
-
-        // Check if user is trying to join their own team
-        if (invitation.team.ownerId === userId) {
-          set.status = 400;
-          return {
-            error: "Bad Request",
-            message: "You cannot join your own team",
-          };
-        }
-
-        // Add user to team and mark invitation as used
-        const [userRole] = await prisma.$transaction([
-          prisma.userRole.create({
-            data: {
-              userId,
-              teamId: invitation.teamId,
-              role: Role.TeamMember,
-            },
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  email: true,
-                  name: true,
-                },
-              },
-              team: {
-                select: {
-                  id: true,
-                  name: true,
-                  description: true,
-                },
-              },
-            },
-          }),
-          prisma.teamInvitation.update({
-            where: { id: invitation.id },
-            data: { used: true },
-          }),
-        ]);
-
-        return {
-          membership: {
-            id: userRole.id,
-            role: userRole.role,
-            user: userRole.user,
-            team: userRole.team,
-            createdAt: userRole.createdAt,
-          },
-          message: "Successfully joined the team",
-        };
-      } catch (err) {
-        set.status = 500;
-        return {
-          error: "Internal Server Error",
-          message: "Failed to accept invitation",
-        };
-      }
-    }
-  )
-  // List invitations for a team (only team owner)
-  .get("/team/:teamId", async ({ params, jwt, headers, set }) => {
+  .post("/:token/accept", async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
       return authResult;
     }
     const { userId } = authResult;
 
-    const { teamId } = params;
+    const { token } = params;
 
-    // Verify user owns the team
-    const team = await prisma.team.findUnique({
-      where: { id: teamId },
-    });
+    try {
+      // Find invitation
+      const invitation = await prisma.projectInvitation.findUnique({
+        where: { token },
+        include: {
+          project: true,
+        },
+      });
 
-    if (!team) {
-      set.status = 404;
+      if (!invitation) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Invitation not found",
+        };
+      }
+
+      // Check if invitation is expired
+      if (new Date() > invitation.expiresAt) {
+        set.status = 410;
+        return {
+          error: "Gone",
+          message: "Invitation has expired",
+        };
+      }
+
+      // Check if invitation was already used
+      if (invitation.used) {
+        set.status = 409;
+        return {
+          error: "Conflict",
+          message: "Invitation has already been used",
+        };
+      }
+
+      // Check if user is already a member of the project
+      const existingMember = await prisma.projectMember.findUnique({
+        where: {
+          userId_projectId: {
+            userId,
+            projectId: invitation.projectId,
+          },
+        },
+      });
+
+      if (existingMember) {
+        set.status = 409;
+        return {
+          error: "Conflict",
+          message: "You are already a member of this project",
+        };
+      }
+
+      // Check if user is trying to join their own project (as admin)
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true },
+      });
+
+      if (user?.isAdmin && invitation.project.creatorId === userId) {
+        set.status = 400;
+        return {
+          error: "Bad Request",
+          message: "You are already the creator of this project",
+        };
+      }
+
+      // Add user to project and mark invitation as used
+      const [projectMember] = await prisma.$transaction([
+        prisma.projectMember.create({
+          data: {
+            userId,
+            projectId: invitation.projectId,
+            role: invitation.role,
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+              },
+            },
+            project: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+              },
+            },
+          },
+        }),
+        prisma.projectInvitation.update({
+          where: { id: invitation.id },
+          data: { used: true },
+        }),
+      ]);
+
       return {
-        error: "Not Found",
-        message: "Team not found",
+        membership: {
+          id: projectMember.id,
+          role: projectMember.role,
+          user: projectMember.user,
+          project: projectMember.project,
+          createdAt: projectMember.createdAt,
+        },
+        message: "Successfully joined the project",
+      };
+    } catch (err) {
+      set.status = 500;
+      return {
+        error: "Internal Server Error",
+        message: "Failed to accept invitation",
       };
     }
+  })
+  // List invitations for a project (only admins)
+  .get("/project/:projectId", async ({ params, jwt, headers, set }) => {
+    const authResult = await requireAuth(jwt, headers, set);
+    if ("error" in authResult) {
+      return authResult;
+    }
+    const { userId } = authResult;
 
-    if (team.ownerId !== userId) {
+    const { projectId } = params;
+
+    // Check if user is admin
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isAdmin: true },
+    });
+
+    if (!user || !user.isAdmin) {
       set.status = 403;
       return {
         error: "Forbidden",
-        message: "Only team owner can view invitations",
+        message: "Only admins can view invitations",
+      };
+    }
+
+    // Verify project exists
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+    });
+
+    if (!project) {
+      set.status = 404;
+      return {
+        error: "Not Found",
+        message: "Project not found",
       };
     }
 
     try {
-      const invitations = await prisma.teamInvitation.findMany({
-        where: { teamId },
+      const invitations = await prisma.projectInvitation.findMany({
+        where: { projectId },
         include: {
-          team: {
+          project: {
             select: {
               id: true,
               name: true,
@@ -353,7 +372,8 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
         invitations: invitations.map((inv) => ({
           id: inv.id,
           token: inv.token,
-          team: inv.team,
+          project: inv.project,
+          role: inv.role,
           expiresAt: inv.expiresAt,
           used: inv.used,
           createdAt: inv.createdAt,
@@ -368,4 +388,3 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
       };
     }
   });
-

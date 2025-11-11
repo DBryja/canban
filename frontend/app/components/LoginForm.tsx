@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Input } from "@/app/components/ui/input";
+import { Button } from "@/app/components/ui/button";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -21,9 +23,12 @@ export default function LoginForm() {
     try {
       await login(email, password);
       const redirect = searchParams.get("redirect");
-      router.push(redirect || "/");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Nie udało się zalogować");
+      router.replace(redirect || "/dashboard");
+    } catch (err: unknown) {
+      const errorMessage =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Nie udało się zalogować";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -31,50 +36,43 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium mb-1">
+      <div className="space-y-2">
+        <label htmlFor="email" className="text-sm font-medium">
           Email
         </label>
-        <input
+        <Input
           id="email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="twoj@email.com"
         />
       </div>
 
-      <div>
-        <label htmlFor="password" className="block text-sm font-medium mb-1">
+      <div className="space-y-2">
+        <label htmlFor="password" className="text-sm font-medium">
           Hasło
         </label>
-        <input
+        <Input
           id="password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="••••••••"
         />
       </div>
 
       {error && (
-        <div className="text-red-600 text-sm bg-red-50 p-3 rounded-md">
+        <div className="text-destructive text-sm bg-destructive/10 p-3 rounded-md border border-destructive/20">
           {error}
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+      <Button type="submit" disabled={loading} className="w-full">
         {loading ? "Logowanie..." : "Zaloguj się"}
-      </button>
+      </Button>
     </form>
   );
 }
-

@@ -156,7 +156,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
 
     // Extract userId from payload (jwt.verify returns ClaimType)
     const userId = (payload as any).userId as string;
-    
+
     if (!userId || typeof userId !== "string") {
       set.status = 401;
       return {
@@ -168,18 +168,11 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        ownedTeam: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-          },
-        },
-        teamRoles: {
+        projectMembers: {
           select: {
             id: true,
             role: true,
-            team: {
+            project: {
               select: {
                 id: true,
                 name: true,
@@ -189,7 +182,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
           },
         },
       },
-    } as any);
+    });
 
     if (!user) {
       set.status = 404;
@@ -203,4 +196,3 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
       user,
     };
   });
-
