@@ -17,9 +17,9 @@ import { useRouter, usePathname } from "next/navigation";
 import {
   Settings,
   LogOut,
-  Users,
   Plus,
   UserPlus,
+  UserCog,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/app/components/ui/avatar";
 import {
@@ -36,7 +36,7 @@ interface Project {
   id: string;
   name: string;
   description: string | null;
-  teamId: string | null;
+  creatorId: string;
 }
 
 // Helper function to create slug from project name
@@ -79,16 +79,23 @@ export function AppSidebar() {
         
         // Sync selected project with URL if on project page
         const pathParts = pathname.split("/").filter(Boolean);
-        if (pathParts.length === 2 && pathParts[0] === "dashboard" && pathParts[1] !== "projects" && pathParts[1] !== "settings" && pathParts[1] !== "team") {
-          const projectSlug = pathParts[1];
-          const project = findProjectBySlug(response.data.projects, projectSlug);
-          if (project) {
-            setSelectedProject(project.id);
+        if (pathParts.length >= 2 && pathParts[0] === "dashboard") {
+          const secondPart = pathParts[1];
+          // Check if second part is a project slug (not reserved routes)
+          if (secondPart !== "projects" && secondPart !== "settings" && secondPart !== "team") {
+            const projectSlug = secondPart;
+            const project = findProjectBySlug(response.data.projects, projectSlug);
+            if (project) {
+              setSelectedProject(project.id);
+            } else {
+              setSelectedProject("");
+            }
           } else {
+            // On reserved routes, clear selection
             setSelectedProject("");
           }
-        } else if (!pathParts.includes("projects") && !pathParts.includes("settings") && !pathParts.includes("team")) {
-          // If not on a project page, clear selection
+        } else {
+          // If not on dashboard, clear selection
           setSelectedProject("");
         }
       } catch (error) {
@@ -100,7 +107,7 @@ export function AppSidebar() {
 
     fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, fullUser?.ownedTeam?.id, pathname]);
+  }, [user, fullUser?.isAdmin, pathname]);
 
   const handleLogout = () => {
     logout();
@@ -121,11 +128,21 @@ export function AppSidebar() {
   };
 
   const handleInviteUser = () => {
-    router.push("/dashboard/team/invite");
+    if (selectedProject) {
+      router.push(`/dashboard/projects/${selectedProject}/invite`);
+    } else {
+      router.push("/dashboard/projects/invite");
+    }
   };
 
-  const handleManageTeam = () => {
-    router.push("/dashboard/team");
+  const handleManageProjectUsers = () => {
+    if (selectedProject) {
+      const project = projects.find((p) => p.id === selectedProject);
+      if (project) {
+        const slug = createSlug(project.name);
+        router.push(`/dashboard/${slug}/manage`);
+      }
+    }
   };
 
   if (!user) return null;
@@ -171,50 +188,37 @@ export function AppSidebar() {
                     </div>
                   )}
                 </SidebarMenuItem>
+                {fullUser?.isAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={handleCreateProject}
+                      className="w-full justify-start"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Dodaj projekt
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
 
-          <SidebarGroup>
-            <SidebarGroupLabel>Projekty</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={handleCreateProject}
-                    className="w-full justify-start"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Dodaj projekt
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          {fullUser?.ownedTeam && (
+          {fullUser?.isAdmin && (
             <SidebarGroup>
-              <SidebarGroupLabel>Zarządzanie Teamem</SidebarGroupLabel>
+              <SidebarGroupLabel>Zarządzanie</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={handleInviteUser}
-                      className="w-full justify-start"
-                    >
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Zaproś użytkownika
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={handleManageTeam}
-                      className="w-full justify-start"
-                    >
-                      <Users className="mr-2 h-4 w-4" />
-                      Zarządzaj teamem
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  {selectedProject && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={handleManageProjectUsers}
+                        className="w-full justify-start"
+                      >
+                        <UserCog className="mr-2 h-4 w-4" />
+                        Zarządzaj użytkownikami
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

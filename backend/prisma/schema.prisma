@@ -13,54 +13,16 @@ model User {
   email     String     @unique
   name      String?
   password  String     // Hashed password for JWT auth
+  isAdmin   Boolean    @default(false) // Admin can create projects and invite users
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
   // Relations
-  teamRoles UserRole[] // User's roles in different teams
-  ownedTeam Team?      // User can own only one team
-  createdTasks Task[]  @relation("TaskCreator")
-}
+  createdProjects Project[]        @relation("ProjectCreator")
+  projectMembers  ProjectMember[]  // User's memberships in projects
+  createdTasks    Task[]           @relation("TaskCreator")
 
-// Team model
-model Team {
-  id          String     @id @default(cuid())
-  name        String
-  description String?
-  ownerId     String     @unique // One owner per team
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  // Relations
-  owner       User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  members     UserRole[] // Team members with roles
-  projects    Project[]
-  invitations TeamInvitation[]
-
-  @@index([ownerId])
-}
-
-// UserRole - junction table for User-Team relationship with role
-enum Role {
-  TeamOwner   // Team owner (only one per team)
-  TeamMember  // Regular team member
-}
-
-model UserRole {
-  id        String   @id @default(cuid())
-  userId    String
-  teamId    String
-  role      Role     @default(TeamMember)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, teamId]) // User can have only one role per team
-  @@index([userId])
-  @@index([teamId])
+  @@index([isAdmin])
 }
 
 // Project model
@@ -68,15 +30,40 @@ model Project {
   id          String   @id @default(cuid())
   name        String
   description String?
-  teamId      String
+  creatorId   String   // Admin who created the project
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  tasks       Task[]
+  creator         User              @relation("ProjectCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  members         ProjectMember[]   // Project members with roles
+  tasks           Task[]
+  invitations     ProjectInvitation[]
 
-  @@index([teamId])
+  @@index([creatorId])
+}
+
+// ProjectMember - junction table for User-Project relationship with role
+enum ProjectRole {
+  Guest      // Can only view project content
+  Maintainer // Can view and edit project content
+}
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  userId    String
+  projectId String
+  role      ProjectRole @default(Guest)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Relations
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId]) // User can have only one role per project
+  @@index([userId])
+  @@index([projectId])
 }
 
 // TaskTag model
@@ -118,21 +105,22 @@ model Task {
   @@index([date])
 }
 
-// TeamInvitation model - for team invitation links with expiration
-model TeamInvitation {
-  id        String   @id @default(cuid())
-  token     String   @unique // Unique invitation token
-  teamId    String
-  expiresAt DateTime // Expiration time
-  used      Boolean  @default(false) // Whether invitation was used
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ProjectInvitation model - for project invitation links with expiration
+model ProjectInvitation {
+  id        String      @id @default(cuid())
+  token     String      @unique // Unique invitation token
+  projectId String
+  role      ProjectRole @default(Guest) // Role to assign when accepting invitation
+  expiresAt DateTime    // Expiration time
+  used      Boolean     @default(false) // Whether invitation was used
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   // Relations
-  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([token])
-  @@index([teamId])
+  @@index([projectId])
   @@index([expiresAt])
 }
 

@@ -11,12 +11,13 @@ interface Project {
   id: string;
   name: string;
   description: string | null;
-  teamId: string;
+  creatorId: string;
   createdAt: string;
   updatedAt: string;
-  team?: {
+  creator?: {
     id: string;
-    name: string;
+    name: string | null;
+    email: string;
   };
   tasks?: Array<{
     id: string;

@@ -168,18 +168,11 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        ownedTeam: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-          },
-        },
-        teamRoles: {
+        projectMembers: {
           select: {
             id: true,
             role: true,
-            team: {
+            project: {
               select: {
                 id: true,
                 name: true,
@@ -189,7 +182,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
           },
         },
       },
-    } as any);
+    });
 
     if (!user) {
       set.status = 404;

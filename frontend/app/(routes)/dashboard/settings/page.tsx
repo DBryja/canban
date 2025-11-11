@@ -7,20 +7,16 @@ import { Avatar, AvatarFallback } from "@/app/components/ui/avatar";
 import { useEffect, useState } from "react";
 import { getCurrentUser } from "@/lib/auth";
 
-interface UserWithTeam {
+interface UserWithProjects {
   id: string;
   email: string;
   name: string | null;
+  isAdmin?: boolean;
   createdAt: string;
-  ownedTeam?: {
-    id: string;
-    name: string;
-    description: string | null;
-  };
-  teamRoles?: Array<{
+  projectMembers?: Array<{
     id: string;
     role: string;
-    team: {
+    project: {
       id: string;
       name: string;
       description: string | null;
@@ -30,7 +26,7 @@ interface UserWithTeam {
 
 export default function SettingsPage() {
   const { user, refreshUser } = useAuth();
-  const [userData, setUserData] = useState<UserWithTeam | null>(null);
+  const [userData, setUserData] = useState<UserWithProjects | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -116,45 +112,32 @@ export default function SettingsPage() {
                   {new Date(user.createdAt).toLocaleDateString("pl-PL")}
                 </p>
               </div>
+              {userData?.isAdmin && (
+                <div>
+                  <p className="text-sm font-medium">Rola:</p>
+                  <p className="text-sm text-muted-foreground">Administrator</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {userData?.ownedTeam && (
+        {userData?.projectMembers && userData.projectMembers.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Twój Team</CardTitle>
-              <CardDescription>Jesteś właścicielem tego teamu</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div>
-                <p className="text-sm font-medium">Nazwa:</p>
-                <p className="text-sm text-muted-foreground">{userData.ownedTeam.name}</p>
-              </div>
-              {userData.ownedTeam.description && (
-                <div>
-                  <p className="text-sm font-medium">Opis:</p>
-                  <p className="text-sm text-muted-foreground">{userData.ownedTeam.description}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {userData?.teamRoles && userData.teamRoles.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Twoje zespoły</CardTitle>
-              <CardDescription>Zespoły, w których jesteś członkiem</CardDescription>
+              <CardTitle>Twoje projekty</CardTitle>
+              <CardDescription>Projekty, w których jesteś członkiem</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {userData.teamRoles.map((role) => (
-                  <div key={role.id} className="border rounded-lg p-3">
-                    <p className="text-sm font-medium">{role.team.name}</p>
-                    <p className="text-xs text-muted-foreground">Rola: {role.role}</p>
-                    {role.team.description && (
-                      <p className="text-xs text-muted-foreground mt-1">{role.team.description}</p>
+                {userData.projectMembers.map((member) => (
+                  <div key={member.id} className="border rounded-lg p-3">
+                    <p className="text-sm font-medium">{member.project.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Rola: {member.role === "Guest" ? "Gość" : "Maintainer"}
+                    </p>
+                    {member.project.description && (
+                      <p className="text-xs text-muted-foreground mt-1">{member.project.description}</p>
                     )}
                   </div>
                 ))}

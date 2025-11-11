@@ -3,16 +3,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, getAuthData, setAuthData, clearAuthData, getCurrentUser } from "@/lib/auth";
 
-interface UserWithTeam extends User {
-  ownedTeam?: {
-    id: string;
-    name: string;
-    description: string | null;
-  };
-  teamRoles?: Array<{
+interface UserWithProjects extends User {
+  isAdmin?: boolean;
+  projectMembers?: Array<{
     id: string;
     role: string;
-    team: {
+    project: {
       id: string;
       name: string;
       description: string | null;
@@ -22,7 +18,7 @@ interface UserWithTeam extends User {
 
 interface AuthContextType {
   user: User | null;
-  fullUser: UserWithTeam | null;
+  fullUser: UserWithProjects | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
@@ -34,7 +30,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [fullUser, setFullUser] = useState<UserWithTeam | null>(null);
+  const [fullUser, setFullUser] = useState<UserWithProjects | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

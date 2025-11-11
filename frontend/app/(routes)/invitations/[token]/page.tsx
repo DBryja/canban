@@ -10,16 +10,17 @@ import { Button } from "@/app/components/ui/button";
 interface Invitation {
   id: string;
   token: string;
-  team: {
+  project: {
     id: string;
     name: string;
     description: string | null;
-    owner: {
+    creator: {
       id: string;
       email: string;
       name: string | null;
     };
   };
+  role: string;
   expiresAt: string;
   createdAt: string;
 }
@@ -70,7 +71,7 @@ export default function InvitationPage() {
       setError(null);
       await api.post(`/invitations/${token}/accept`);
 
-      // Refresh user data to get updated team info
+      // Refresh user data to get updated project info
       await refreshUser();
 
       setSuccess(true);
@@ -86,9 +87,9 @@ export default function InvitationPage() {
       } else if (errorData?.status === 410) {
         setError("Zaproszenie wygasło");
       } else if (errorData?.status === 409) {
-        setError(errorData.data?.message || "Już jesteś członkiem tego teamu");
+        setError(errorData.data?.message || "Już jesteś członkiem tego projektu");
       } else if (errorData?.status === 400) {
-        setError(errorData.data?.message || "Nie możesz dołączyć do własnego teamu");
+        setError(errorData.data?.message || "Nie możesz dołączyć do własnego projektu");
       } else {
         setError("Nie udało się zaakceptować zaproszenia");
       }
@@ -160,7 +161,7 @@ export default function InvitationPage() {
           <CardHeader>
             <CardTitle className="text-green-600">Sukces!</CardTitle>
             <CardDescription>
-              Dołączyłeś do teamu {invitation?.team.name}
+              Dołączyłeś do projektu {invitation?.project.name}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -187,9 +188,9 @@ export default function InvitationPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Zaproszenie do teamu</CardTitle>
+          <CardTitle>Zaproszenie do projektu</CardTitle>
           <CardDescription>
-            Zostałeś zaproszony do dołączenia do teamu
+            Zostałeś zaproszony do dołączenia do projektu
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -201,21 +202,28 @@ export default function InvitationPage() {
 
           <div className="space-y-2">
             <div>
-              <label className="text-sm font-medium text-muted-foreground">Nazwa teamu</label>
-              <p className="text-lg font-semibold">{invitation.team.name}</p>
+              <label className="text-sm font-medium text-muted-foreground">Nazwa projektu</label>
+              <p className="text-lg font-semibold">{invitation.project.name}</p>
             </div>
 
-            {invitation.team.description && (
+            {invitation.project.description && (
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Opis</label>
-                <p className="text-sm">{invitation.team.description}</p>
+                <p className="text-sm">{invitation.project.description}</p>
               </div>
             )}
 
             <div>
-              <label className="text-sm font-medium text-muted-foreground">Właściciel</label>
+              <label className="text-sm font-medium text-muted-foreground">Twórca</label>
               <p className="text-sm">
-                {invitation.team.owner.name || invitation.team.owner.email}
+                {invitation.project.creator.name || invitation.project.creator.email}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">Rola</label>
+              <p className="text-sm">
+                {invitation.role === "Guest" ? "Gość (tylko przeglądanie)" : "Maintainer (może edytować)"}
               </p>
             </div>
 

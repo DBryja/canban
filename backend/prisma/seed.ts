@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient, ProjectRole } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth";
 
 const prisma = new PrismaClient();
@@ -6,125 +6,52 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding database...");
 
-  // Create users with passwords
-  const defaultPassword = await hashPassword("password123");
+  // Create admin user
+  const adminPassword = await hashPassword("admin!");
+  const admin = await prisma.user.create({
+    data: {
+      email: "admin@admin.com",
+      name: "Admin",
+      password: adminPassword,
+      isAdmin: true,
+    },
+  });
+
+  console.log("✅ Created admin user");
+
+  // Create regular users
+  const user1Password = await hashPassword("user1!");
+  const user2Password = await hashPassword("user2!");
+  const guest1Password = await hashPassword("guest1!");
+
   const users = await Promise.all([
     prisma.user.create({
       data: {
-        email: "alice@example.com",
-        name: "Alice Johnson",
-        password: defaultPassword,
+        email: "user1@user.com",
+        name: "User 1",
+        password: user1Password,
+        isAdmin: false,
       },
     }),
     prisma.user.create({
       data: {
-        email: "bob@example.com",
-        name: "Bob Smith",
-        password: defaultPassword,
+        email: "user2@user2.com",
+        name: "User 2",
+        password: user2Password,
+        isAdmin: false,
       },
     }),
     prisma.user.create({
       data: {
-        email: "charlie@example.com",
-        name: "Charlie Brown",
-        password: defaultPassword,
-      },
-    }),
-    prisma.user.create({
-      data: {
-        email: "diana@example.com",
-        name: "Diana Prince",
-        password: defaultPassword,
-      },
-    }),
-    prisma.user.create({
-      data: {
-        email: "eve@example.com",
-        name: "Eve Adams",
-        password: defaultPassword,
+        email: "guest1@guest.com",
+        name: "Guest 1",
+        password: guest1Password,
+        isAdmin: false,
       },
     }),
   ]);
 
-  console.log(`✅ Created ${users.length} users`);
-
-  // Create teams with owners
-  const teams = await Promise.all([
-    prisma.team.create({
-      data: {
-        name: "Development Team",
-        description: "Main development team",
-        ownerId: users[0].id,
-      },
-    }),
-    prisma.team.create({
-      data: {
-        name: "Design Team",
-        description: "UI/UX design team",
-        ownerId: users[3].id,
-      },
-    }),
-    prisma.team.create({
-      data: {
-        name: "Marketing Team",
-        description: "Marketing and communication",
-        ownerId: users[4].id,
-      },
-    }),
-  ]);
-
-  console.log(`✅ Created ${teams.length} teams`);
-
-  // Create user roles (assign users to teams)
-  await Promise.all([
-    // Development Team
-    prisma.userRole.create({
-      data: {
-        userId: users[0].id,
-        teamId: teams[0].id,
-        role: Role.TeamOwner,
-      },
-    }),
-    prisma.userRole.create({
-      data: {
-        userId: users[1].id,
-        teamId: teams[0].id,
-        role: Role.TeamMember,
-      },
-    }),
-    prisma.userRole.create({
-      data: {
-        userId: users[2].id,
-        teamId: teams[0].id,
-        role: Role.TeamMember,
-      },
-    }),
-    // Design Team
-    prisma.userRole.create({
-      data: {
-        userId: users[3].id,
-        teamId: teams[1].id,
-        role: Role.TeamOwner,
-      },
-    }),
-    prisma.userRole.create({
-      data: {
-        userId: users[0].id,
-        teamId: teams[1].id,
-        role: Role.TeamMember,
-      },
-    }),
-    // Marketing Team
-    prisma.userRole.create({
-      data: {
-        userId: users[4].id,
-        teamId: teams[2].id,
-        role: Role.TeamOwner,
-      },
-    }),
-  ]);
-
-  console.log("✅ Created user roles");
+  console.log(`✅ Created ${users.length} regular users`);
 
   // Create task tags
   const tags = await Promise.all([
@@ -168,39 +95,55 @@ async function main() {
 
   console.log(`✅ Created ${tags.length} task tags`);
 
-  // Create projects
+  // Create projects (only admins can create projects)
   const projects = await Promise.all([
     prisma.project.create({
       data: {
         name: "TaskMaster Web App",
         description: "Main web application project",
-        teamId: teams[0].id,
+        creatorId: admin.id,
       },
     }),
     prisma.project.create({
       data: {
         name: "Mobile App",
         description: "Mobile application development",
-        teamId: teams[0].id,
-      },
-    }),
-    prisma.project.create({
-      data: {
-        name: "Design System",
-        description: "UI design system",
-        teamId: teams[1].id,
-      },
-    }),
-    prisma.project.create({
-      data: {
-        name: "Marketing Campaign",
-        description: "Q1 marketing campaign",
-        teamId: teams[2].id,
+        creatorId: admin.id,
       },
     }),
   ]);
 
   console.log(`✅ Created ${projects.length} projects`);
+
+  // Add some project members (users invited to projects)
+  await Promise.all([
+    // User1 as Maintainer in first project
+    prisma.projectMember.create({
+      data: {
+        userId: users[0].id,
+        projectId: projects[0].id,
+        role: ProjectRole.Maintainer,
+      },
+    }),
+    // User2 as Guest in first project
+    prisma.projectMember.create({
+      data: {
+        userId: users[1].id,
+        projectId: projects[0].id,
+        role: ProjectRole.Guest,
+      },
+    }),
+    // Guest1 as Guest in second project
+    prisma.projectMember.create({
+      data: {
+        userId: users[2].id,
+        projectId: projects[1].id,
+        role: ProjectRole.Guest,
+      },
+    }),
+  ]);
+
+  console.log("✅ Created project memberships");
 
   // Create tasks (at least 30 records)
   const taskTitles = [
@@ -272,12 +215,16 @@ async function main() {
 
   console.log("\n✨ Seeding completed successfully!");
   console.log(`\n📊 Summary:`);
+  console.log(`   - Admin: 1`);
   console.log(`   - Users: ${users.length}`);
-  console.log(`   - Teams: ${teams.length}`);
   console.log(`   - Projects: ${projects.length}`);
   console.log(`   - Task Tags: ${tags.length}`);
   console.log(`   - Tasks: ${tasks.length}`);
-  console.log(`   - Total records: ${users.length + teams.length + projects.length + tags.length + tasks.length}`);
+  console.log(`\n🔑 Login credentials:`);
+  console.log(`   - Admin: admin@admin.com / admin!`);
+  console.log(`   - User 1: user1@user.com / user1!`);
+  console.log(`   - User 2: user2@user2.com / user2!`);
+  console.log(`   - Guest 1: guest1@guest.com / guest1!`);
 }
 
 main()

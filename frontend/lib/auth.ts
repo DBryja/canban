@@ -4,6 +4,7 @@ export interface User {
   id: string;
   email: string;
   name: string | null;
+  isAdmin?: boolean;
   createdAt: string;
 }
 
@@ -48,8 +49,8 @@ export async function register(
 }
 
 // Get current user
-export async function getCurrentUser(): Promise<{ user: User & { ownedTeam?: any; teamRoles?: any[] } }> {
-  const response = await api.get<{ user: User & { ownedTeam?: any; teamRoles?: any[] } }>("/auth/me");
+export async function getCurrentUser(): Promise<{ user: User & { isAdmin?: boolean; projectMembers?: any[] } }> {
+  const response = await api.get<{ user: User & { isAdmin?: boolean; projectMembers?: any[] } }>("/auth/me");
   return response.data;
 }
 

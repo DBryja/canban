@@ -15,7 +15,7 @@ export default function DashboardPage() {
         <CardHeader>
           <CardTitle>Witaj!</CardTitle>
           <CardDescription>
-            Wybierz projekt z sidebaru lub utwórz nowy projekt, jeśli jesteś właścicielem teamu.
+            Wybierz projekt z sidebaru lub utwórz nowy projekt, jeśli jesteś administratorem.
           </CardDescription>
         </CardHeader>
         <CardContent>
