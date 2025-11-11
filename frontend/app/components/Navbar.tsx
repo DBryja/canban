@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Hide navbar on dashboard pages
+  if (pathname?.startsWith("/dashboard")) {
+    return null;
+  }
 
   const handleLogout = () => {
     logout();
@@ -22,34 +28,37 @@ export default function Navbar() {
           </Link>
 
           <div className="flex items-center gap-4">
-            {user ? (
+            {!loading && user ? (
               <>
                 <span className="text-sm text-muted-foreground">
                   {user.name || user.email}
                 </span>
+                <Link href="/dashboard" className="text-sm text-primary hover:underline">
+                  Dashboard
+                </Link>
                 <button
                   onClick={handleLogout}
-                  className="text-sm text-blue-600 hover:underline"
+                  className="text-sm text-primary hover:underline"
                 >
                   Wyloguj
                 </button>
               </>
-            ) : (
+            ) : !loading ? (
               <>
                 <Link
                   href="/login"
-                  className="text-sm text-blue-600 hover:underline"
+                  className="text-sm text-primary hover:underline"
                 >
                   Zaloguj się
                 </Link>
                 <Link
                   href="/register"
-                  className="text-sm bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                  className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90"
                 >
                   Zarejestruj się
                 </Link>
               </>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
