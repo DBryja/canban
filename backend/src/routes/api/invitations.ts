@@ -2,11 +2,10 @@ import { Elysia, t } from "elysia";
 import { prisma } from "../../lib/prisma";
 import { jwtPlugin } from "../../lib/jwt";
 import { requireAuth } from "../../middleware/auth";
-import { ProjectRole } from "@prisma/client";
 import { randomBytes } from "crypto";
 
 // Generate unique invitation token
-function generateInvitationToken(): string {
+function generateInvitationToken() {
   return randomBytes(32).toString("hex");
 }
 
@@ -64,7 +63,7 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
           data: {
             token,
             projectId,
-            role: role || ProjectRole.Guest,
+            role: role || "Guest",
             expiresAt,
           },
           include: {

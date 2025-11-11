@@ -2,7 +2,6 @@ import { Elysia, t } from "elysia";
 import { prisma } from "../../lib/prisma";
 import { jwtPlugin } from "../../lib/jwt";
 import { requireAuth } from "../../middleware/auth";
-import { ProjectRole } from "@prisma/client";
 
 export const projectRoutes = new Elysia({ prefix: "/projects" })
   .use(jwtPlugin)
@@ -440,7 +439,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       }
 
       // Check access: admin or project member
-      if (!user?.isAdmin) {
+      if (user?.isAdmin) {
         const membership = await prisma.projectMember.findUnique({
           where: {
             userId_projectId: {
