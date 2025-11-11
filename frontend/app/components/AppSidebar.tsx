@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
 } from "@/app/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Settings,
   LogOut,
@@ -39,9 +39,23 @@ interface Project {
   teamId: string | null;
 }
 
+// Helper function to create slug from project name
+function createSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+// Helper function to find project by slug
+function findProjectBySlug(projects: Project[], slug: string): Project | undefined {
+  return projects.find((p) => createSlug(p.name) === slug || p.id === slug);
+}
+
 export function AppSidebar() {
   const { user, fullUser, logout, refreshUser } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -62,8 +76,20 @@ export function AppSidebar() {
         setLoading(true);
         const response = await api.get<{ projects: Project[] }>("/projects");
         setProjects(response.data.projects);
-        if (response.data.projects.length > 0 && !selectedProject) {
-          setSelectedProject(response.data.projects[0].id);
+        
+        // Sync selected project with URL if on project page
+        const pathParts = pathname.split("/").filter(Boolean);
+        if (pathParts.length === 2 && pathParts[0] === "dashboard" && pathParts[1] !== "projects" && pathParts[1] !== "settings" && pathParts[1] !== "team") {
+          const projectSlug = pathParts[1];
+          const project = findProjectBySlug(response.data.projects, projectSlug);
+          if (project) {
+            setSelectedProject(project.id);
+          } else {
+            setSelectedProject("");
+          }
+        } else if (!pathParts.includes("projects") && !pathParts.includes("settings") && !pathParts.includes("team")) {
+          // If not on a project page, clear selection
+          setSelectedProject("");
         }
       } catch (error) {
         console.error("Failed to fetch projects:", error);
@@ -74,7 +100,7 @@ export function AppSidebar() {
 
     fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, fullUser?.ownedTeam?.id]);
+  }, [user, fullUser?.ownedTeam?.id, pathname]);
 
   const handleLogout = () => {
     logout();
@@ -82,8 +108,12 @@ export function AppSidebar() {
   };
 
   const handleProjectChange = (projectId: string) => {
-    setSelectedProject(projectId);
-    // Możesz tutaj dodać logikę do przełączania projektu
+    const project = projects.find((p) => p.id === projectId);
+    if (project) {
+      setSelectedProject(projectId);
+      const slug = createSlug(project.name);
+      router.push(`/dashboard/${slug}`);
+    }
   };
 
   const handleCreateProject = () => {
@@ -121,7 +151,7 @@ export function AppSidebar() {
                     <div className="px-2 py-1.5 text-sm">Ładowanie...</div>
                   ) : projects.length > 0 ? (
                     <Select
-                      value={selectedProject}
+                      value={selectedProject || undefined}
                       onValueChange={handleProjectChange}
                     >
                       <SelectTrigger className="w-full">
