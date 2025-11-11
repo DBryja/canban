@@ -30,6 +30,8 @@ import {
 } from "@/app/components/ui/sheet";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { UserPlus, Trash2, RefreshCw, Copy } from "lucide-react";
+import { useAppSidebar } from "@/app/components/AppSidebar/context";
+import type { Project } from "@/app/components/AppSidebar/utils";
 
 interface ProjectMember {
   id: string;
@@ -42,12 +44,6 @@ interface ProjectMember {
   createdAt: string;
 }
 
-interface Project {
-  id: string;
-  name: string;
-  description: string | null;
-}
-
 interface Invitation {
   id: string;
   token: string;
@@ -58,18 +54,11 @@ interface Invitation {
   isValid: boolean;
 }
 
-// Helper function to create slug from project name
-function createSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
 export default function ProjectManagePage() {
   const params = useParams();
   const router = useRouter();
   const { user, fullUser } = useAuth();
+  const { findProjectBySlug } = useAppSidebar();
   const projectSlug = params["project-slug"] as string;
 
   const [project, setProject] = useState<Project | null>(null);
@@ -99,16 +88,8 @@ export default function ProjectManagePage() {
         setLoading(true);
         setError(null);
 
-        // First, get all projects to find the one matching the slug
-        const projectsResponse = await api.get<{ projects: Project[] }>(
-          "/projects"
-        );
-        const projects = projectsResponse.data.projects;
-
-        // Find project by slug or ID
-        const foundProject = projects.find(
-          (p) => createSlug(p.name) === projectSlug || p.id === projectSlug
-        );
+        // Find project by slug using utility from AppSidebar
+        const foundProject = findProjectBySlug(projectSlug);
 
         if (!foundProject) {
           setError("Projekt nie został znaleziony");
@@ -150,7 +131,7 @@ export default function ProjectManagePage() {
     };
 
     fetchData();
-  }, [projectSlug, user, fullUser]);
+  }, [projectSlug, user, fullUser, findProjectBySlug]);
 
   const handleRoleChange = async (
     memberId: string,

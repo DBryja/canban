@@ -3,9 +3,15 @@ import NextLink, { type LinkProps as NextLinkProps } from "next/link";
 type LinkProps = NextLinkProps & {
   children: React.ReactNode;
   target?: "_blank" | "_self" | "_parent" | "_top";
+  className?: string;
 };
 
-export default function Link({ href, children, target = "_self" }: LinkProps) {
+export default function Link({
+  href,
+  children,
+  target = "_self",
+  className,
+}: LinkProps) {
   let url = href.toString();
 
   if (url.includes("{{s}}")) {
@@ -28,7 +34,7 @@ export default function Link({ href, children, target = "_self" }: LinkProps) {
   }
 
   return (
-    <NextLink href={url} target={target}>
+    <NextLink href={url} target={target} className={className}>
       {children}
     </NextLink>
   );
