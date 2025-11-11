@@ -156,7 +156,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
 
     // Extract userId from payload (jwt.verify returns ClaimType)
     const userId = (payload as any).userId as string;
-    
+
     if (!userId || typeof userId !== "string") {
       set.status = 401;
       return {
@@ -196,4 +196,3 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
       user,
     };
   });
-

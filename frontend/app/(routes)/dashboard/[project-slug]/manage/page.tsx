@@ -4,11 +4,30 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/app/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/app/components/ui/sheet";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { UserPlus, Trash2, RefreshCw, Copy } from "lucide-react";
 
@@ -81,7 +100,9 @@ export default function ProjectManagePage() {
         setError(null);
 
         // First, get all projects to find the one matching the slug
-        const projectsResponse = await api.get<{ projects: Project[] }>("/projects");
+        const projectsResponse = await api.get<{ projects: Project[] }>(
+          "/projects"
+        );
         const projects = projectsResponse.data.projects;
 
         // Find project by slug or ID
@@ -105,15 +126,17 @@ export default function ProjectManagePage() {
 
         // Fetch project invitations
         try {
-          const invitationsResponse = await api.get<{ invitations: Invitation[] }>(
-            `/invitations/project/${foundProject.id}`
-          );
+          const invitationsResponse = await api.get<{
+            invitations: Invitation[];
+          }>(`/invitations/project/${foundProject.id}`);
           setInvitations(invitationsResponse.data.invitations);
         } catch (err) {
           console.error("Failed to fetch invitations:", err);
         }
       } catch (err: unknown) {
-        const errorData = (err as { response?: { data?: { message?: string }; status?: number } })?.response;
+        const errorData = (
+          err as { response?: { data?: { message?: string }; status?: number } }
+        )?.response;
         if (errorData?.status === 403) {
           setError("Nie masz uprawnień do zarządzania tym projektem");
         } else if (errorData?.status === 404) {
@@ -129,7 +152,10 @@ export default function ProjectManagePage() {
     fetchData();
   }, [projectSlug, user, fullUser]);
 
-  const handleRoleChange = async (memberId: string, newRole: "Guest" | "Maintainer") => {
+  const handleRoleChange = async (
+    memberId: string,
+    newRole: "Guest" | "Maintainer"
+  ) => {
     if (!project) return;
 
     try {
@@ -329,7 +355,10 @@ export default function ProjectManagePage() {
                     Wygeneruj link zaproszenia, który możesz wysłać użytkownikom
                   </SheetDescription>
                 </SheetHeader>
-                <form onSubmit={handleCreateInvitation} className="space-y-4 mt-4 p-4">
+                <form
+                  onSubmit={handleCreateInvitation}
+                  className="space-y-4 mt-4 p-4"
+                >
                   {inviteError && (
                     <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
                       {inviteError}
@@ -340,19 +369,31 @@ export default function ProjectManagePage() {
                     <label htmlFor="role" className="text-sm font-medium">
                       Rola *
                     </label>
-                    <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as "Guest" | "Maintainer")}>
+                    <Select
+                      value={inviteRole}
+                      onValueChange={(value) =>
+                        setInviteRole(value as "Guest" | "Maintainer")
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Guest">Gość (tylko przeglądanie)</SelectItem>
-                        <SelectItem value="Maintainer">Maintainer (może edytować)</SelectItem>
+                        <SelectItem value="Guest">
+                          Gość (tylko przeglądanie)
+                        </SelectItem>
+                        <SelectItem value="Maintainer">
+                          Maintainer (może edytować)
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <label htmlFor="expiresInHours" className="text-sm font-medium">
+                    <label
+                      htmlFor="expiresInHours"
+                      className="text-sm font-medium"
+                    >
                       Ważność (w godzinach)
                     </label>
                     <Input
@@ -361,7 +402,9 @@ export default function ProjectManagePage() {
                       min="1"
                       max="168"
                       value={inviteExpiresInHours}
-                      onChange={(e) => setInviteExpiresInHours(Number(e.target.value))}
+                      onChange={(e) =>
+                        setInviteExpiresInHours(Number(e.target.value))
+                      }
                       required
                     />
                     <p className="text-xs text-muted-foreground">
@@ -370,8 +413,14 @@ export default function ProjectManagePage() {
                   </div>
 
                   <div className="flex gap-2">
-                    <Button type="submit" disabled={creatingInvitation} className="flex-1">
-                      {creatingInvitation ? "Tworzenie..." : "Utwórz zaproszenie"}
+                    <Button
+                      type="submit"
+                      disabled={creatingInvitation}
+                      className="flex-1"
+                    >
+                      {creatingInvitation
+                        ? "Tworzenie..."
+                        : "Utwórz zaproszenie"}
                     </Button>
                   </div>
                 </form>
@@ -390,7 +439,8 @@ export default function ProjectManagePage() {
           <CardContent>
             {members.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Brak członków w tym projekcie. Zaproś użytkowników, aby rozpocząć.
+                Brak członków w tym projekcie. Zaproś użytkowników, aby
+                rozpocząć.
               </p>
             ) : (
               <div className="space-y-3">
@@ -407,14 +457,18 @@ export default function ProjectManagePage() {
                         {member.user.email}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Dołączył: {new Date(member.createdAt).toLocaleDateString("pl-PL")}
+                        Dołączył:{" "}
+                        {new Date(member.createdAt).toLocaleDateString("pl-PL")}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Select
                         value={member.role}
                         onValueChange={(value) =>
-                          handleRoleChange(member.id, value as "Guest" | "Maintainer")
+                          handleRoleChange(
+                            member.id,
+                            value as "Guest" | "Maintainer"
+                          )
                         }
                         disabled={updatingRole === member.id}
                       >
@@ -452,7 +506,8 @@ export default function ProjectManagePage() {
           <CardContent>
             {invitations.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Brak zaproszeń. Utwórz nowe zaproszenie, aby zaprosić użytkowników.
+                Brak zaproszeń. Utwórz nowe zaproszenie, aby zaprosić
+                użytkowników.
               </p>
             ) : (
               <div className="space-y-3">
@@ -465,23 +520,36 @@ export default function ProjectManagePage() {
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <p className={`text-sm font-medium ${
-                          invitation.isValid ? "text-green-600" : "text-muted-foreground"
-                        }`}>
-                          {invitation.isValid ? "Aktywne" : invitation.used ? "Użyte" : "Wygasło"}
+                        <p
+                          className={`text-sm font-medium ${
+                            invitation.isValid
+                              ? "text-green-600"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {invitation.isValid
+                            ? "Aktywne"
+                            : invitation.used
+                              ? "Użyte"
+                              : "Wygasło"}
                         </p>
                         {invitation.used && (
-                          <span className="text-xs text-muted-foreground">(użyte)</span>
+                          <span className="text-xs text-muted-foreground">
+                            (użyte)
+                          </span>
                         )}
                         <span className="text-xs text-muted-foreground">
-                          ({invitation.role === "Guest" ? "Gość" : "Maintainer"})
+                          ({invitation.role === "Guest" ? "Gość" : "Maintainer"}
+                          )
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Wygasa: {new Date(invitation.expiresAt).toLocaleString("pl-PL")}
+                        Wygasa:{" "}
+                        {new Date(invitation.expiresAt).toLocaleString("pl-PL")}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Utworzone: {new Date(invitation.createdAt).toLocaleString("pl-PL")}
+                        Utworzone:{" "}
+                        {new Date(invitation.createdAt).toLocaleString("pl-PL")}
                       </p>
                     </div>
                     <Button
@@ -503,4 +571,3 @@ export default function ProjectManagePage() {
     </ProtectedRoute>
   );
 }
-

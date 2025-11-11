@@ -1,6 +1,12 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 
 export default function DashboardPage() {
   return (
@@ -15,7 +21,8 @@ export default function DashboardPage() {
         <CardHeader>
           <CardTitle>Witaj!</CardTitle>
           <CardDescription>
-            Wybierz projekt z sidebaru lub utwórz nowy projekt, jeśli jesteś administratorem.
+            Wybierz projekt z sidebaru lub utwórz nowy projekt, jeśli jesteś
+            administratorem.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -27,4 +34,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

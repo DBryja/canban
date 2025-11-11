@@ -15,11 +15,8 @@ export default function DashboardLayout({
         <div className="flex h-screen sticky top-0">
           <AppSidebar />
         </div>
-        <main className="flex-1 overflow-auto p-4">
-            {children}
-        </main>
+        <main className="flex-1 overflow-auto p-4">{children}</main>
       </SidebarProvider>
     </ProtectedRoute>
   );
 }
-

@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
 
 interface Project {
@@ -51,11 +57,13 @@ export default function ProjectPage() {
       try {
         setLoading(true);
         setError(null);
-        
+
         // First, get all projects to find the one matching the slug
-        const projectsResponse = await api.get<{ projects: Project[] }>("/projects");
+        const projectsResponse = await api.get<{ projects: Project[] }>(
+          "/projects"
+        );
         const projects = projectsResponse.data.projects;
-        
+
         // Find project by slug or ID
         const foundProject = projects.find(
           (p) => createSlug(p.name) === projectSlug || p.id === projectSlug
@@ -67,10 +75,14 @@ export default function ProjectPage() {
         }
 
         // Fetch full project details
-        const projectResponse = await api.get<Project>(`/projects/${foundProject.id}`);
+        const projectResponse = await api.get<Project>(
+          `/projects/${foundProject.id}`
+        );
         setProject(projectResponse.data);
       } catch (err: unknown) {
-        const errorData = (err as { response?: { data?: { message?: string }; status?: number } })?.response;
+        const errorData = (
+          err as { response?: { data?: { message?: string }; status?: number } }
+        )?.response;
         if (errorData?.status === 404) {
           setError("Projekt nie został znaleziony");
         } else {
@@ -136,11 +148,15 @@ export default function ProjectPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-muted-foreground">ID projektu</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                ID projektu
+              </label>
               <p className="text-sm">{project.id}</p>
             </div>
             <div>
-              <label className="text-sm font-medium text-muted-foreground">Utworzony</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Utworzony
+              </label>
               <p className="text-sm">
                 {new Date(project.createdAt).toLocaleDateString("pl-PL", {
                   year: "numeric",
@@ -152,7 +168,9 @@ export default function ProjectPage() {
               </p>
             </div>
             <div>
-              <label className="text-sm font-medium text-muted-foreground">Ostatnia aktualizacja</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Ostatnia aktualizacja
+              </label>
               <p className="text-sm">
                 {new Date(project.updatedAt).toLocaleDateString("pl-PL", {
                   year: "numeric",
@@ -169,4 +187,3 @@ export default function ProjectPage() {
     </ProtectedRoute>
   );
 }
-

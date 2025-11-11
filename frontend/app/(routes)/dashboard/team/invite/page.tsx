@@ -1,10 +1,22 @@
 "use client";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
@@ -46,10 +58,13 @@ export default function InviteUserPage() {
       try {
         const response = await api.get<{ projects: Project[] }>("/projects");
         setProjects(response.data.projects);
-        
+
         // Check if projectId is provided in query params
         const queryProjectId = searchParams.get("projectId");
-        if (queryProjectId && response.data.projects.some(p => p.id === queryProjectId)) {
+        if (
+          queryProjectId &&
+          response.data.projects.some((p) => p.id === queryProjectId)
+        ) {
           setProjectId(queryProjectId);
         } else if (response.data.projects.length > 0 && !projectId) {
           setProjectId(response.data.projects[0].id);
@@ -215,13 +230,22 @@ export default function InviteUserPage() {
                 <label htmlFor="role" className="text-sm font-medium">
                   Rola *
                 </label>
-                <Select value={role} onValueChange={(value) => setRole(value as "Guest" | "Maintainer")}>
+                <Select
+                  value={role}
+                  onValueChange={(value) =>
+                    setRole(value as "Guest" | "Maintainer")
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Guest">Gość (tylko przeglądanie)</SelectItem>
-                    <SelectItem value="Maintainer">Maintainer (może edytować)</SelectItem>
+                    <SelectItem value="Guest">
+                      Gość (tylko przeglądanie)
+                    </SelectItem>
+                    <SelectItem value="Maintainer">
+                      Maintainer (może edytować)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -298,23 +322,43 @@ export default function InviteUserPage() {
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p className={`text-sm font-medium ${
-                            invitation.isValid ? "text-green-600" : "text-muted-foreground"
-                          }`}>
-                            {invitation.isValid ? "Aktywne" : invitation.used ? "Użyte" : "Wygasło"}
+                          <p
+                            className={`text-sm font-medium ${
+                              invitation.isValid
+                                ? "text-green-600"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {invitation.isValid
+                              ? "Aktywne"
+                              : invitation.used
+                                ? "Użyte"
+                                : "Wygasło"}
                           </p>
                           {invitation.used && (
-                            <span className="text-xs text-muted-foreground">(użyte)</span>
+                            <span className="text-xs text-muted-foreground">
+                              (użyte)
+                            </span>
                           )}
                           <span className="text-xs text-muted-foreground">
-                            ({invitation.role === "Guest" ? "Gość" : "Maintainer"})
+                            (
+                            {invitation.role === "Guest"
+                              ? "Gość"
+                              : "Maintainer"}
+                            )
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Wygasa: {new Date(invitation.expiresAt).toLocaleString("pl-PL")}
+                          Wygasa:{" "}
+                          {new Date(invitation.expiresAt).toLocaleString(
+                            "pl-PL"
+                          )}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Utworzone: {new Date(invitation.createdAt).toLocaleString("pl-PL")}
+                          Utworzone:{" "}
+                          {new Date(invitation.createdAt).toLocaleString(
+                            "pl-PL"
+                          )}
                         </p>
                       </div>
                       <Button

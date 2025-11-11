@@ -2,7 +2,13 @@
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 import { Avatar, AvatarFallback } from "@/app/components/ui/avatar";
 import { useEffect, useState } from "react";
 import { getCurrentUser } from "@/lib/auth";
@@ -86,10 +92,14 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
-                <AvatarFallback className="text-lg">{userInitials}</AvatarFallback>
+                <AvatarFallback className="text-lg">
+                  {userInitials}
+                </AvatarFallback>
               </Avatar>
               <div>
-                <p className="text-sm font-medium">{user.name || "Brak imienia"}</p>
+                <p className="text-sm font-medium">
+                  {user.name || "Brak imienia"}
+                </p>
                 <p className="text-sm text-muted-foreground">{user.email}</p>
               </div>
             </div>
@@ -104,7 +114,9 @@ export default function SettingsPage() {
               </div>
               <div>
                 <p className="text-sm font-medium">Imię:</p>
-                <p className="text-sm text-muted-foreground">{user.name || "Brak"}</p>
+                <p className="text-sm text-muted-foreground">
+                  {user.name || "Brak"}
+                </p>
               </div>
               <div>
                 <p className="text-sm font-medium">Data rejestracji:</p>
@@ -126,7 +138,9 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Twoje projekty</CardTitle>
-              <CardDescription>Projekty, w których jesteś członkiem</CardDescription>
+              <CardDescription>
+                Projekty, w których jesteś członkiem
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -137,7 +151,9 @@ export default function SettingsPage() {
                       Rola: {member.role === "Guest" ? "Gość" : "Maintainer"}
                     </p>
                     {member.project.description && (
-                      <p className="text-xs text-muted-foreground mt-1">{member.project.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {member.project.description}
+                      </p>
                     )}
                   </div>
                 ))}
@@ -149,4 +165,3 @@ export default function SettingsPage() {
     </ProtectedRoute>
   );
 }
-

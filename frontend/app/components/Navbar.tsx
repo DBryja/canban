@@ -33,7 +33,10 @@ export default function Navbar() {
                 <span className="text-sm text-muted-foreground">
                   {user.name || user.email}
                 </span>
-                <Link href="/dashboard" className="text-sm text-primary hover:underline">
+                <Link
+                  href="/dashboard"
+                  className="text-sm text-primary hover:underline"
+                >
                   Dashboard
                 </Link>
                 <button
@@ -65,4 +68,3 @@ export default function Navbar() {
     </nav>
   );
 }
-

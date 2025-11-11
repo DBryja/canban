@@ -36,17 +36,17 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       const url = error.config?.url || "";
-      
+
       // Don't auto-redirect for these endpoints - let components handle errors
       const skipAutoRedirect = [
         "/auth/me",
         "/projects", // Let AppSidebar handle the error gracefully
       ];
-      
+
       if (skipAutoRedirect.some((endpoint) => url.includes(endpoint))) {
         return Promise.reject(error);
       }
-      
+
       // Token expired or invalid for other endpoints
       if (typeof window !== "undefined") {
         localStorage.removeItem("token");
@@ -60,4 +60,3 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-

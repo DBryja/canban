@@ -6,7 +6,8 @@ const app = new Elysia()
   .onRequest(({ request, set }) => {
     // Set CORS headers for all requests
     set.headers["Access-Control-Allow-Origin"] = "*";
-    set.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH";
+    set.headers["Access-Control-Allow-Methods"] =
+      "GET, POST, PUT, DELETE, OPTIONS, PATCH";
     set.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
   })
   .onAfterHandle(({ response, set, path, request }) => {
@@ -20,7 +21,9 @@ const app = new Elysia()
     const status = set.status || 500;
     const timestamp = new Date().toISOString();
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[${timestamp}] ${method} ${path} ${status} - ${errorMessage}`);
+    console.error(
+      `[${timestamp}] ${method} ${path} ${status} - ${errorMessage}`
+    );
   })
   .options("*", ({ set }) => {
     return new Response(null, { status: 204 });

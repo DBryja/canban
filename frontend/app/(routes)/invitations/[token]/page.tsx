@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 
 interface Invitation {
@@ -44,14 +50,21 @@ export default function InvitationPage() {
       try {
         setLoading(true);
         setError(null);
-        const response = await api.get<{ invitation: Invitation }>(`/invitations/${token}`);
+        const response = await api.get<{ invitation: Invitation }>(
+          `/invitations/${token}`
+        );
         setInvitation(response.data.invitation);
       } catch (err: unknown) {
-        const errorData = (err as { response?: { data?: { message?: string }; status?: number } })?.response;
+        const errorData = (
+          err as { response?: { data?: { message?: string }; status?: number } }
+        )?.response;
         if (errorData?.status === 404) {
           setError("Zaproszenie nie zostało znalezione");
         } else if (errorData?.status === 410) {
-          setError(errorData.data?.message || "Zaproszenie wygasło lub zostało już użyte");
+          setError(
+            errorData.data?.message ||
+              "Zaproszenie wygasło lub zostało już użyte"
+          );
         } else {
           setError("Nie udało się pobrać szczegółów zaproszenia");
         }
@@ -75,21 +88,27 @@ export default function InvitationPage() {
       await refreshUser();
 
       setSuccess(true);
-      
+
       // Redirect to dashboard after a short delay
       setTimeout(() => {
         router.push("/dashboard");
       }, 2000);
     } catch (err: unknown) {
-      const errorData = (err as { response?: { data?: { message?: string }; status?: number } })?.response;
+      const errorData = (
+        err as { response?: { data?: { message?: string }; status?: number } }
+      )?.response;
       if (errorData?.status === 404) {
         setError("Zaproszenie nie zostało znalezione");
       } else if (errorData?.status === 410) {
         setError("Zaproszenie wygasło");
       } else if (errorData?.status === 409) {
-        setError(errorData.data?.message || "Już jesteś członkiem tego projektu");
+        setError(
+          errorData.data?.message || "Już jesteś członkiem tego projektu"
+        );
       } else if (errorData?.status === 400) {
-        setError(errorData.data?.message || "Nie możesz dołączyć do własnego projektu");
+        setError(
+          errorData.data?.message || "Nie możesz dołączyć do własnego projektu"
+        );
       } else {
         setError("Nie udało się zaakceptować zaproszenia");
       }
@@ -115,7 +134,10 @@ export default function InvitationPage() {
             <CardDescription>{error}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => router.push("/dashboard")} className="w-full">
+            <Button
+              onClick={() => router.push("/dashboard")}
+              className="w-full"
+            >
               Przejdź do dashboardu
             </Button>
           </CardContent>
@@ -136,13 +158,21 @@ export default function InvitationPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Button
-              onClick={() => router.push(`/login?redirect=${encodeURIComponent(`/invitations/${token}`)}`)}
+              onClick={() =>
+                router.push(
+                  `/login?redirect=${encodeURIComponent(`/invitations/${token}`)}`
+                )
+              }
               className="w-full"
             >
               Zaloguj się
             </Button>
             <Button
-              onClick={() => router.push(`/register?redirect=${encodeURIComponent(`/invitations/${token}`)}`)}
+              onClick={() =>
+                router.push(
+                  `/register?redirect=${encodeURIComponent(`/invitations/${token}`)}`
+                )
+              }
               variant="outline"
               className="w-full"
             >
@@ -177,7 +207,9 @@ export default function InvitationPage() {
   if (!invitation) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Ładowanie szczegółów zaproszenia...</div>
+        <div className="text-muted-foreground">
+          Ładowanie szczegółów zaproszenia...
+        </div>
       </div>
     );
   }
@@ -202,33 +234,46 @@ export default function InvitationPage() {
 
           <div className="space-y-2">
             <div>
-              <label className="text-sm font-medium text-muted-foreground">Nazwa projektu</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Nazwa projektu
+              </label>
               <p className="text-lg font-semibold">{invitation.project.name}</p>
             </div>
 
             {invitation.project.description && (
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Opis</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Opis
+                </label>
                 <p className="text-sm">{invitation.project.description}</p>
               </div>
             )}
 
             <div>
-              <label className="text-sm font-medium text-muted-foreground">Twórca</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Twórca
+              </label>
               <p className="text-sm">
-                {invitation.project.creator.name || invitation.project.creator.email}
+                {invitation.project.creator.name ||
+                  invitation.project.creator.email}
               </p>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-muted-foreground">Rola</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Rola
+              </label>
               <p className="text-sm">
-                {invitation.role === "Guest" ? "Gość (tylko przeglądanie)" : "Maintainer (może edytować)"}
+                {invitation.role === "Guest"
+                  ? "Gość (tylko przeglądanie)"
+                  : "Maintainer (może edytować)"}
               </p>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-muted-foreground">Wygasa</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Wygasa
+              </label>
               <p className="text-sm">
                 {new Date(invitation.expiresAt).toLocaleDateString("pl-PL", {
                   year: "numeric",
@@ -252,13 +297,21 @@ export default function InvitationPage() {
               </p>
               <div className="flex gap-2">
                 <Button
-                  onClick={() => router.push(`/login?redirect=${encodeURIComponent(`/invitations/${token}`)}`)}
+                  onClick={() =>
+                    router.push(
+                      `/login?redirect=${encodeURIComponent(`/invitations/${token}`)}`
+                    )
+                  }
                   className="flex-1"
                 >
                   Zaloguj się
                 </Button>
                 <Button
-                  onClick={() => router.push(`/register?redirect=${encodeURIComponent(`/invitations/${token}`)}`)}
+                  onClick={() =>
+                    router.push(
+                      `/register?redirect=${encodeURIComponent(`/invitations/${token}`)}`
+                    )
+                  }
                   variant="outline"
                   className="flex-1"
                 >
@@ -289,4 +342,3 @@ export default function InvitationPage() {
     </div>
   );
 }
-

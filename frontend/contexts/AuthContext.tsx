@@ -1,7 +1,13 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { User, getAuthData, setAuthData, clearAuthData, getCurrentUser } from "@/lib/auth";
+import {
+  User,
+  getAuthData,
+  setAuthData,
+  clearAuthData,
+  getCurrentUser,
+} from "@/lib/auth";
 
 interface UserWithProjects extends User {
   isAdmin?: boolean;
@@ -40,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Set user immediately from storage for instant UI
       setUser(storedUser);
       setLoading(false);
-      
+
       // Verify token is still valid in background and get full user data
       getCurrentUser()
         .then(({ user: fullUserData }) => {
@@ -50,7 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
         .catch((error) => {
           // Only clear if token is actually invalid (401 or 403)
-          if (error.response?.status === 401 || error.response?.status === 403) {
+          if (
+            error.response?.status === 401 ||
+            error.response?.status === 403
+          ) {
             clearAuthData();
             setUser(null);
             setFullUser(null);
@@ -123,7 +132,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAuthData(token, fullUserData);
       }
     } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response?.status;
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
       // Only logout if token is actually invalid (401/403)
       // Don't logout on network errors or other issues
       if (status === 401 || status === 403) {
@@ -137,7 +147,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, fullUser, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{ user, fullUser, loading, login, register, logout, refreshUser }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -150,4 +162,3 @@ export function useAuth() {
   }
   return context;
 }
-

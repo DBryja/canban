@@ -4,7 +4,11 @@ import { useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
+export default function ProtectedRoute({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -13,7 +17,9 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   useEffect(() => {
     if (!loading && !user && !hasRedirected.current) {
       hasRedirected.current = true;
-      router.replace(`/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`);
+      router.replace(
+        `/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`
+      );
     }
   }, [user, loading, router, pathname]);
 
@@ -35,4 +41,3 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   return <>{children}</>;
 }
-

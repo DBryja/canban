@@ -101,7 +101,9 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
     {
       body: t.Object({
         projectId: t.String(),
-        role: t.Optional(t.Union([t.Literal("Guest"), t.Literal("Maintainer")])),
+        role: t.Optional(
+          t.Union([t.Literal("Guest"), t.Literal("Maintainer")])
+        ),
         expiresInHours: t.Optional(t.Number({ minimum: 1, maximum: 168 })), // Max 7 days
       }),
     }
@@ -188,134 +190,131 @@ export const invitationRoutes = new Elysia({ prefix: "/invitations" })
     }
   })
   // Accept invitation (only for authenticated users)
-  .post(
-    "/:token/accept",
-    async ({ params, jwt, headers, set }) => {
-      const authResult = await requireAuth(jwt, headers, set);
-      if ("error" in authResult) {
-        return authResult;
-      }
-      const { userId } = authResult;
-
-      const { token } = params;
-
-      try {
-        // Find invitation
-        const invitation = await prisma.projectInvitation.findUnique({
-          where: { token },
-          include: {
-            project: true,
-          },
-        });
-
-        if (!invitation) {
-          set.status = 404;
-          return {
-            error: "Not Found",
-            message: "Invitation not found",
-          };
-        }
-
-        // Check if invitation is expired
-        if (new Date() > invitation.expiresAt) {
-          set.status = 410;
-          return {
-            error: "Gone",
-            message: "Invitation has expired",
-          };
-        }
-
-        // Check if invitation was already used
-        if (invitation.used) {
-          set.status = 409;
-          return {
-            error: "Conflict",
-            message: "Invitation has already been used",
-          };
-        }
-
-        // Check if user is already a member of the project
-        const existingMember = await prisma.projectMember.findUnique({
-          where: {
-            userId_projectId: {
-              userId,
-              projectId: invitation.projectId,
-            },
-          },
-        });
-
-        if (existingMember) {
-          set.status = 409;
-          return {
-            error: "Conflict",
-            message: "You are already a member of this project",
-          };
-        }
-
-        // Check if user is trying to join their own project (as admin)
-        const user = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { isAdmin: true },
-        });
-
-        if (user?.isAdmin && invitation.project.creatorId === userId) {
-          set.status = 400;
-          return {
-            error: "Bad Request",
-            message: "You are already the creator of this project",
-          };
-        }
-
-        // Add user to project and mark invitation as used
-        const [projectMember] = await prisma.$transaction([
-          prisma.projectMember.create({
-            data: {
-              userId,
-              projectId: invitation.projectId,
-              role: invitation.role,
-            },
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  email: true,
-                  name: true,
-                },
-              },
-              project: {
-                select: {
-                  id: true,
-                  name: true,
-                  description: true,
-                },
-              },
-            },
-          }),
-          prisma.projectInvitation.update({
-            where: { id: invitation.id },
-            data: { used: true },
-          }),
-        ]);
-
-        return {
-          membership: {
-            id: projectMember.id,
-            role: projectMember.role,
-            user: projectMember.user,
-            project: projectMember.project,
-            createdAt: projectMember.createdAt,
-          },
-          message: "Successfully joined the project",
-        };
-      } catch (err) {
-        set.status = 500;
-        return {
-          error: "Internal Server Error",
-          message: "Failed to accept invitation",
-        };
-      }
+  .post("/:token/accept", async ({ params, jwt, headers, set }) => {
+    const authResult = await requireAuth(jwt, headers, set);
+    if ("error" in authResult) {
+      return authResult;
     }
-  )
+    const { userId } = authResult;
+
+    const { token } = params;
+
+    try {
+      // Find invitation
+      const invitation = await prisma.projectInvitation.findUnique({
+        where: { token },
+        include: {
+          project: true,
+        },
+      });
+
+      if (!invitation) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Invitation not found",
+        };
+      }
+
+      // Check if invitation is expired
+      if (new Date() > invitation.expiresAt) {
+        set.status = 410;
+        return {
+          error: "Gone",
+          message: "Invitation has expired",
+        };
+      }
+
+      // Check if invitation was already used
+      if (invitation.used) {
+        set.status = 409;
+        return {
+          error: "Conflict",
+          message: "Invitation has already been used",
+        };
+      }
+
+      // Check if user is already a member of the project
+      const existingMember = await prisma.projectMember.findUnique({
+        where: {
+          userId_projectId: {
+            userId,
+            projectId: invitation.projectId,
+          },
+        },
+      });
+
+      if (existingMember) {
+        set.status = 409;
+        return {
+          error: "Conflict",
+          message: "You are already a member of this project",
+        };
+      }
+
+      // Check if user is trying to join their own project (as admin)
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true },
+      });
+
+      if (user?.isAdmin && invitation.project.creatorId === userId) {
+        set.status = 400;
+        return {
+          error: "Bad Request",
+          message: "You are already the creator of this project",
+        };
+      }
+
+      // Add user to project and mark invitation as used
+      const [projectMember] = await prisma.$transaction([
+        prisma.projectMember.create({
+          data: {
+            userId,
+            projectId: invitation.projectId,
+            role: invitation.role,
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+              },
+            },
+            project: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+              },
+            },
+          },
+        }),
+        prisma.projectInvitation.update({
+          where: { id: invitation.id },
+          data: { used: true },
+        }),
+      ]);
+
+      return {
+        membership: {
+          id: projectMember.id,
+          role: projectMember.role,
+          user: projectMember.user,
+          project: projectMember.project,
+          createdAt: projectMember.createdAt,
+        },
+        message: "Successfully joined the project",
+      };
+    } catch (err) {
+      set.status = 500;
+      return {
+        error: "Internal Server Error",
+        message: "Failed to accept invitation",
+      };
+    }
+  })
   // List invitations for a project (only admins)
   .get("/project/:projectId", async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);

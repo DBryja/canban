@@ -1,7 +1,13 @@
 "use client";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -116,4 +122,3 @@ export default function NewProjectPage() {
     </ProtectedRoute>
   );
 }
-

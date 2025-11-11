@@ -11,7 +11,8 @@ export function guardApi(
   set: { status?: number | string }
 ): { error: string; message: string } | undefined {
   // Get secret from various sources
-  const headerSecret = headers["x-api-secret"] || headers["authorization"]?.replace("Bearer ", "");
+  const headerSecret =
+    headers["x-api-secret"] || headers["authorization"]?.replace("Bearer ", "");
   const querySecret = query?.["api-secret"] || query?.["secret"];
 
   const secret = headerSecret || querySecret;
@@ -37,7 +38,7 @@ export async function requireAuth(
   set: { status?: number | string }
 ): Promise<JWTPayload | { error: string; message: string }> {
   const authHeader = headers["authorization"];
-  
+
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     set.status = 401;
     return {
@@ -61,7 +62,12 @@ export async function requireAuth(
   const userId = (payload as any).userId as string;
   const email = (payload as any).email as string;
 
-  if (!userId || !email || typeof userId !== "string" || typeof email !== "string") {
+  if (
+    !userId ||
+    !email ||
+    typeof userId !== "string" ||
+    typeof email !== "string"
+  ) {
     set.status = 401;
     return {
       error: "Unauthorized",

@@ -1,0 +1,42 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+.next
+out
+build
+dist
+*.tsbuildinfo
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env*.local
+
+# Lock files
+package-lock.json
+yarn.lock
+bun.lock
+pnpm-lock.yaml
+
+# Database
+*.db
+*.sqlite
+
+# Prisma
+prisma/migrations
+
+# Generated files
+next-env.d.ts
+
+# Public assets
+public
+
+# Labs (optional - if you don't want to format images/docs)
+labs/**/*.png
+labs/**/*.jpg
+
