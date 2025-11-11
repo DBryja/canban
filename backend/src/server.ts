@@ -3,15 +3,26 @@ import { prisma } from "./lib/prisma";
 import { routes } from "./routes";
 
 const app = new Elysia()
-  .onAfterHandle(({ response, set }) => {
+  .onRequest(({ request, set }) => {
+    // Set CORS headers for all requests
     set.headers["Access-Control-Allow-Origin"] = "*";
     set.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH";
     set.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
   })
+  .onAfterHandle(({ response, set, path, request }) => {
+    const method = request.method;
+    const status = set.status || 200;
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${method} ${path} ${status}`);
+  })
+  .onError(({ error, path, request, set }) => {
+    const method = request.method;
+    const status = set.status || 500;
+    const timestamp = new Date().toISOString();
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[${timestamp}] ${method} ${path} ${status} - ${errorMessage}`);
+  })
   .options("*", ({ set }) => {
-    set.headers["Access-Control-Allow-Origin"] = "*";
-    set.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH";
-    set.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
     return new Response(null, { status: 204 });
   });
 
