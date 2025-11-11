@@ -1,5 +1,6 @@
 import RegisterForm from "@/components/RegisterForm";
 import Link from "next/link";
+import { Suspense } from "react";
 
 export default function RegisterPage() {
   return (
@@ -11,7 +12,9 @@ export default function RegisterPage() {
             Utwórz konto, aby rozpocząć pracę
           </p>
 
-          <RegisterForm />
+          <Suspense fallback={<div>Ładowanie...</div>}>
+            <RegisterForm />
+          </Suspense>
 
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">Masz już konto? </span>

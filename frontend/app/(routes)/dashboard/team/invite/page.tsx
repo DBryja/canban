@@ -47,6 +47,31 @@ export default function InviteUserPage() {
     }
   }, [user]);
 
+  // Auto-refresh invitations when page becomes visible
+  useEffect(() => {
+    if (!teamId) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchInvitations(teamId);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Also set up interval to refresh every 30 seconds
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchInvitations(teamId);
+      }
+    }, 30000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [teamId]);
+
   const fetchInvitations = async (teamId: string) => {
     setLoadingInvitations(true);
     try {
@@ -176,10 +201,22 @@ export default function InviteUserPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Aktywne zaproszenia</CardTitle>
-            <CardDescription>
-              Lista wszystkich zaproszeń dla tego teamu
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Aktywne zaproszenia</CardTitle>
+                <CardDescription>
+                  Lista wszystkich zaproszeń dla tego teamu
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => teamId && fetchInvitations(teamId)}
+                disabled={loadingInvitations}
+              >
+                {loadingInvitations ? "Odświeżanie..." : "Odśwież"}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loadingInvitations ? (
@@ -193,12 +230,21 @@ export default function InviteUserPage() {
                 {invitations.map((invitation) => (
                   <div
                     key={invitation.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
+                    className={`flex items-center justify-between p-3 border rounded-lg ${
+                      !invitation.isValid ? "opacity-60" : ""
+                    }`}
                   >
                     <div className="flex-1">
-                      <p className="text-sm font-medium">
-                        {invitation.isValid ? "Aktywne" : "Nieaktywne"}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className={`text-sm font-medium ${
+                          invitation.isValid ? "text-green-600" : "text-muted-foreground"
+                        }`}>
+                          {invitation.isValid ? "Aktywne" : invitation.used ? "Użyte" : "Wygasło"}
+                        </p>
+                        {invitation.used && (
+                          <span className="text-xs text-muted-foreground">(użyte)</span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         Wygasa: {new Date(invitation.expiresAt).toLocaleString("pl-PL")}
                       </p>
@@ -210,6 +256,7 @@ export default function InviteUserPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => copyInvitationLink(invitation.token)}
+                      disabled={!invitation.isValid}
                     >
                       Kopiuj link
                     </Button>

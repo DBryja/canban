@@ -23,7 +23,7 @@ export default function LoginForm() {
     try {
       await login(email, password);
       const redirect = searchParams.get("redirect");
-      router.push(redirect || "/");
+      router.replace(redirect || "/dashboard");
     } catch (err: unknown) {
       const errorMessage =
         (err as { response?: { data?: { message?: string } } })?.response?.data
