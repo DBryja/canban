@@ -439,7 +439,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       }
 
       // Check access: admin or project member
-      if (user?.isAdmin) {
+      if (!user?.isAdmin) {
         const membership = await prisma.projectMember.findUnique({
           where: {
             userId_projectId: {
