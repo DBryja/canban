@@ -779,6 +779,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
               projectId: true,
               creatorId: true,
               mainTagId: true,
+              number: true,
               tags: {
                 select: {
                   id: true,

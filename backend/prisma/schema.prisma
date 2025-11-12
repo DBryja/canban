@@ -91,6 +91,7 @@ model Task {
   projectId   String
   creatorId   String
   mainTagId   String?   // Main tag for grouping
+  number      Int       // Task number within project (starts from 1)
   date        DateTime? // Optional date
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -101,6 +102,7 @@ model Task {
   mainTag     TaskTag?  @relation("TaskMainTag", fields: [mainTagId], references: [id])
   tags        TaskTag[] @relation("TaskTags")
 
+  @@unique([projectId, number]) // Task number must be unique within project
   @@index([projectId])
   @@index([creatorId])
   @@index([mainTagId])

@@ -12,6 +12,7 @@ export interface Project {
   };
   tasks?: Array<{
     id: string;
+    number: number;
     title: string;
     description: string | null;
     tags?: Array<{
