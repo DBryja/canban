@@ -165,6 +165,24 @@ async function main() {
 
   console.log(`✅ Created ${projects.length} projects`);
 
+  // Create default columns for each project using status tags
+  for (const project of projects) {
+    const columns = await Promise.all(
+      statusTags.map((tag, index) =>
+        prisma.projectColumn.create({
+          data: {
+            projectId: project.id,
+            tagId: tag.id,
+            order: index,
+          },
+        })
+      )
+    );
+    console.log(
+      `✅ Created ${columns.length} default columns for project "${project.name}"`
+    );
+  }
+
   // Add some project members (users invited to projects)
   await Promise.all([
     // User1 as Maintainer in first project

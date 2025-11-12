@@ -350,7 +350,7 @@ export default function ProjectPage() {
                             >
                               <CardHeader className="p-0 pb-2">
                                 <CardTitle className="text-base">
-                                  #{task.number} - {task.title}
+                                  #{task.number ?? "?"} - {task.title}
                                 </CardTitle>
                                 {task.description && (
                                   <CardDescription className="text-sm text-wrap">
