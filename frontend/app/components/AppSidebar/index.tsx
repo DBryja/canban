@@ -14,7 +14,15 @@ import {
 } from "@/app/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { Settings, LogOut, Plus, UserCog, Home } from "lucide-react";
+import {
+  Settings,
+  LogOut,
+  Plus,
+  UserCog,
+  Home,
+  Info,
+  LayoutDashboard,
+} from "lucide-react";
 import { Avatar, AvatarFallback } from "@/app/components/ui/avatar";
 import {
   Select,
@@ -166,6 +174,74 @@ function AppSidebarProjectGroup() {
   );
 }
 
+function AppSidebarProjectBoardButton({
+  ...props
+}: React.ComponentProps<typeof SidebarMenuButton>) {
+  const { selectedProject, getProjectUrl } = useAppSidebar();
+  const router = useRouter();
+
+  if (!selectedProject) return null;
+
+  const handleClick = () => {
+    const url = getProjectUrl(selectedProject);
+    router.push(`${url}`);
+  };
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        onClick={handleClick}
+        className="w-full justify-start"
+        {...props}
+      >
+        <LayoutDashboard className="mr-2 h-4 w-4" />
+        Tablica
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+// Project details button component
+function AppSidebarProjectDetailsButton({
+  ...props
+}: React.ComponentProps<typeof SidebarMenuButton>) {
+  const { selectedProject, getProjectUrl } = useAppSidebar();
+  const router = useRouter();
+
+  if (!selectedProject) return null;
+
+  const handleClick = () => {
+    const url = getProjectUrl(selectedProject);
+    router.push(`${url}/details`);
+  };
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        onClick={handleClick}
+        className="w-full justify-start"
+        {...props}
+      >
+        <Info className="mr-2 h-4 w-4" />
+        Szczegóły
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+function AppSidebarProjectOptions() {
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>Opcje</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <AppSidebarProjectBoardButton />
+          <AppSidebarProjectDetailsButton />
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
 // Manage users button component
 function AppSidebarManageUsersButton({
   ...props
@@ -305,6 +381,7 @@ function AppSidebarDefault() {
       <AppSidebarContent>
         <AppSidebarHomeButton />
         <AppSidebarProjectGroup />
+        <AppSidebarProjectOptions />
         <AppSidebarManageUsersButton />
         <AppSidebarAccountSection>
           <AppSidebarSettingsButton />
@@ -327,6 +404,7 @@ export const AppSidebar = Object.assign(AppSidebarDefault, {
   ProjectGroup: AppSidebarProjectGroup,
   ProjectSelect: AppSidebarProjectSelect,
   CreateProjectButton: AppSidebarCreateProjectButton,
+  ProjectDetailsButton: AppSidebarProjectDetailsButton,
   ManageUsersButton: AppSidebarManageUsersButton,
   AccountSection: AppSidebarAccountSection,
   SettingsButton: AppSidebarSettingsButton,
