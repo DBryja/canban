@@ -39,6 +39,7 @@ model Project {
   members         ProjectMember[]   // Project members with roles
   tasks           Task[]
   invitations     ProjectInvitation[]
+  columns         ProjectColumn[]   // Project columns for kanban board
 
   @@index([creatorId])
 }
@@ -77,6 +78,7 @@ model TaskTag {
   // Relations
   tasks        Task[]          @relation("TaskTags")
   mainTagTasks Task[]          @relation("TaskMainTag")
+  columns      ProjectColumn[] // Columns that use this tag
 
   @@index([name])
 }
@@ -122,5 +124,24 @@ model ProjectInvitation {
   @@index([token])
   @@index([projectId])
   @@index([expiresAt])
+}
+
+// ProjectColumn model - columns for kanban board linked to tags
+model ProjectColumn {
+  id        String   @id @default(cuid())
+  projectId String
+  tagId     String   // Tag that defines this column
+  order     Int      // Order of column in the board
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tag       TaskTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, tagId]) // One tag can only be used once per project
+  @@index([projectId])
+  @@index([tagId])
+  @@index([projectId, order]) // For ordering columns within a project
 }
 

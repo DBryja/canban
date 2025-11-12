@@ -371,6 +371,381 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       };
     }
   })
+  // Get project columns - must be before /:id route
+  .get("/:id/columns", async ({ params, jwt, headers, set }) => {
+    const authResult = await requireAuth(jwt, headers, set);
+    if ("error" in authResult) {
+      return authResult;
+    }
+    const { userId } = authResult;
+    const { id } = params;
+
+    try {
+      // Check if user has access to this project
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true },
+      });
+
+      const project = await prisma.project.findUnique({
+        where: { id },
+      });
+
+      if (!project) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Project not found",
+        };
+      }
+
+      // Check access: admin or project member
+      if (!user?.isAdmin) {
+        const membership = await prisma.projectMember.findUnique({
+          where: {
+            userId_projectId: {
+              userId,
+              projectId: id,
+            },
+          },
+        });
+
+        if (!membership) {
+          set.status = 403;
+          return {
+            error: "Forbidden",
+            message: "You don't have access to this project",
+          };
+        }
+      }
+
+      const columns = await prisma.projectColumn.findMany({
+        where: { projectId: id },
+        include: {
+          tag: {
+            select: {
+              id: true,
+              name: true,
+              color: true,
+            },
+          },
+        },
+        orderBy: {
+          order: "asc",
+        },
+      });
+
+      return { columns };
+    } catch (err) {
+      set.status = 500;
+      return {
+        error: "Internal Server Error",
+        message: "Failed to fetch project columns",
+      };
+    }
+  })
+  // Create project column - must be before /:id route
+  .post(
+    "/:id/columns",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id } = params;
+
+      try {
+        // Check if user is admin or maintainer
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        // Check access: admin or maintainer
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId: id,
+              },
+            },
+          });
+
+          if (!membership || membership.role !== "Maintainer") {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "Only admins and maintainers can manage columns",
+            };
+          }
+        }
+
+        // Verify tag exists
+        const tag = await prisma.taskTag.findUnique({
+          where: { id: body.tagId },
+        });
+
+        if (!tag) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Tag not found",
+          };
+        }
+
+        // Check if column with this tag already exists
+        const existingColumn = await prisma.projectColumn.findUnique({
+          where: {
+            projectId_tagId: {
+              projectId: id,
+              tagId: body.tagId,
+            },
+          },
+        });
+
+        if (existingColumn) {
+          set.status = 400;
+          return {
+            error: "Bad Request",
+            message: "Column with this tag already exists",
+          };
+        }
+
+        // Get max order for this project
+        const maxOrderColumn = await prisma.projectColumn.findFirst({
+          where: { projectId: id },
+          orderBy: { order: "desc" },
+        });
+
+        const newOrder = maxOrderColumn ? maxOrderColumn.order + 1 : 0;
+
+        const column = await prisma.projectColumn.create({
+          data: {
+            projectId: id,
+            tagId: body.tagId,
+            order: body.order !== undefined ? body.order : newOrder,
+          },
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        });
+
+        return {
+          column,
+          message: "Column created successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to create column",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        tagId: t.String(),
+        order: t.Optional(t.Number()),
+      }),
+    }
+  )
+  // Update project column order - must be before /:id route
+  .patch(
+    "/:id/columns/:columnId",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id, columnId } = params;
+
+      try {
+        // Check if user is admin or maintainer
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        // Check access: admin or maintainer
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId: id,
+              },
+            },
+          });
+
+          if (!membership || membership.role !== "Maintainer") {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "Only admins and maintainers can manage columns",
+            };
+          }
+        }
+
+        // Verify column exists and belongs to this project
+        const column = await prisma.projectColumn.findUnique({
+          where: { id: columnId },
+        });
+
+        if (!column || column.projectId !== id) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Column not found",
+          };
+        }
+
+        // Update column
+        const updatedColumn = await prisma.projectColumn.update({
+          where: { id: columnId },
+          data: {
+            order: body.order !== undefined ? body.order : column.order,
+            tagId: body.tagId !== undefined ? body.tagId : column.tagId,
+          },
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        });
+
+        return {
+          column: updatedColumn,
+          message: "Column updated successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to update column",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        order: t.Optional(t.Number()),
+        tagId: t.Optional(t.String()),
+      }),
+    }
+  )
+  // Delete project column - must be before /:id route
+  .delete("/:id/columns/:columnId", async ({ params, jwt, headers, set }) => {
+    const authResult = await requireAuth(jwt, headers, set);
+    if ("error" in authResult) {
+      return authResult;
+    }
+    const { userId } = authResult;
+    const { id, columnId } = params;
+
+    try {
+      // Check if user is admin or maintainer
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true },
+      });
+
+      const project = await prisma.project.findUnique({
+        where: { id },
+      });
+
+      if (!project) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Project not found",
+        };
+      }
+
+      // Check access: admin or maintainer
+      if (!user?.isAdmin) {
+        const membership = await prisma.projectMember.findUnique({
+          where: {
+            userId_projectId: {
+              userId,
+              projectId: id,
+            },
+          },
+        });
+
+        if (!membership || membership.role !== "Maintainer") {
+          set.status = 403;
+          return {
+            error: "Forbidden",
+            message: "Only admins and maintainers can manage columns",
+          };
+        }
+      }
+
+      // Verify column exists and belongs to this project
+      const column = await prisma.projectColumn.findUnique({
+        where: { id: columnId },
+      });
+
+      if (!column || column.projectId !== id) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Column not found",
+        };
+      }
+
+      // Delete column
+      await prisma.projectColumn.delete({
+        where: { id: columnId },
+      });
+
+      return {
+        message: "Column deleted successfully",
+      };
+    } catch (err) {
+      set.status = 500;
+      return {
+        error: "Internal Server Error",
+        message: "Failed to delete column",
+      };
+    }
+  })
   .get("/:id", async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
@@ -427,6 +802,20 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
               },
             },
           },
+          columns: {
+            include: {
+              tag: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
+                },
+              },
+            },
+            orderBy: {
+              order: "asc",
+            },
+          },
         },
       });
 
@@ -464,6 +853,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
         description: project.description,
         creator: project.creator,
         tasks: project.tasks,
+        columns: project.columns,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
       };

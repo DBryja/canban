@@ -14,6 +14,22 @@ export interface Project {
     id: string;
     title: string;
     description: string | null;
+    tags?: Array<{
+      id: string;
+      name: string;
+      color: string | null;
+    }>;
+  }>;
+  columns?: Array<{
+    id: string;
+    projectId: string;
+    tagId: string;
+    order: number;
+    tag: {
+      id: string;
+      name: string;
+      color: string | null;
+    };
   }>;
 }
 
