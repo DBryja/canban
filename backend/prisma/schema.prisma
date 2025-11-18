@@ -21,6 +21,8 @@ model User {
   createdProjects Project[]        @relation("ProjectCreator")
   projectMembers  ProjectMember[]  // User's memberships in projects
   createdTasks    Task[]           @relation("TaskCreator")
+  assignedTasks   Task[]           @relation("TaskAssignee")
+  comments        Comment[]
 
   @@index([isAdmin])
 }
@@ -90,6 +92,7 @@ model Task {
   description String?
   projectId   String
   creatorId   String
+  assigneeId  String?   // User assigned to this task
   mainTagId   String?   // Main tag for grouping
   number      Int       // Task number within project (starts from 1)
   date        DateTime? // Optional date
@@ -99,13 +102,16 @@ model Task {
   // Relations
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   creator     User      @relation("TaskCreator", fields: [creatorId], references: [id])
+  assignee    User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
   mainTag     TaskTag?  @relation("TaskMainTag", fields: [mainTagId], references: [id])
   tags        TaskTag[] @relation("TaskTags")
   columnOrders TaskColumnOrder[] // Task orders in columns
+  comments    Comment[]
 
   @@unique([projectId, number]) // Task number must be unique within project
   @@index([projectId])
   @@index([creatorId])
+  @@index([assigneeId])
   @@index([mainTagId])
   @@index([date])
 }
@@ -168,3 +174,19 @@ model TaskColumnOrder {
   @@index([columnId, order]) // For ordering tasks within a column
 }
 
+// Comment model - comments on tasks
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  taskId    String
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+
+  @@index([taskId])
+  @@index([authorId])
+}

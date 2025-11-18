@@ -51,6 +51,7 @@ import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { useAppSidebar } from "@/app/components/AppSidebar/context";
 import type { Project } from "@/app/components/AppSidebar/utils";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Separator } from "@/app/components/ui/separator";
 
 interface TaskTag {
   id: string;
@@ -71,6 +72,11 @@ interface Task {
   number: number | null;
   title: string;
   description: string | null;
+  assignee?: {
+    id: string;
+    email: string;
+    name: string | null;
+  } | null;
   tags?: Array<{
     id: string;
     name: string;
@@ -83,9 +89,43 @@ interface Task {
   }>;
 }
 
+interface TaskDetails {
+  id: string;
+  title: string;
+  description: string | null;
+  number: number;
+  assignee: {
+    id: string;
+    email: string;
+    name: string | null;
+  } | null;
+  comments: Array<{
+    id: string;
+    content: string;
+    author: {
+      id: string;
+      email: string;
+      name: string | null;
+    };
+    createdAt: string;
+  }>;
+}
+
+interface ProjectMember {
+  id: string;
+  role: string;
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+  };
+  createdAt: string;
+}
+
 interface SortableTaskProps {
   task: Task;
   columnId: string;
+  onTaskClick: (taskId: string) => void;
 }
 
 function TaskCard({
@@ -136,7 +176,7 @@ function TaskCard({
   );
 }
 
-function SortableTask({ task, columnId }: SortableTaskProps) {
+function SortableTask({ task, onTaskClick }: SortableTaskProps) {
   const {
     attributes,
     listeners,
@@ -152,12 +192,18 @@ function SortableTask({ task, columnId }: SortableTaskProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onTaskClick(task.id);
+  };
+
   return (
     <div ref={setNodeRef} style={style}>
       <div
         className="cursor-grab active:cursor-grabbing"
         {...attributes}
         {...listeners}
+        onClick={handleClick}
       >
         <TaskCard task={task} />
       </div>
@@ -187,7 +233,16 @@ export default function ProjectPage() {
   >(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
-  const [updatingTask, setUpdatingTask] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [taskDetails, setTaskDetails] = useState<TaskDetails | null>(null);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
+  const [loadingTaskDetails, setLoadingTaskDetails] = useState(false);
+  const [description, setDescription] = useState("");
+  const [commentContent, setCommentContent] = useState("");
+  const [savingDescription, setSavingDescription] = useState(false);
+  const [savingAssignee, setSavingAssignee] = useState(false);
+  const [addingComment, setAddingComment] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -262,6 +317,130 @@ export default function ProjectPage() {
     if (!wrapperEl) return;
     setColumnHeight(wrapperEl.clientHeight + "px" ?? "800px");
   }, [project]);
+
+  useEffect(() => {
+    if (!project || !selectedTaskId) return;
+
+    const fetchTaskDetails = async () => {
+      try {
+        setLoadingTaskDetails(true);
+        const response = await api.get<{ task: TaskDetails }>(
+          `/projects/${project.id}/tasks/${selectedTaskId}`
+        );
+        setTaskDetails(response.data.task);
+        setDescription(response.data.task.description || "");
+      } catch (err) {
+        console.error("Failed to fetch task details:", err);
+      } finally {
+        setLoadingTaskDetails(false);
+      }
+    };
+
+    fetchTaskDetails();
+  }, [project, selectedTaskId]);
+
+  useEffect(() => {
+    if (!project || !isTaskModalOpen) return;
+
+    const fetchMembers = async () => {
+      try {
+        const response = await api.get<{ members: ProjectMember[] }>(
+          `/projects/${project.id}/members`
+        );
+        setProjectMembers(response.data.members);
+      } catch (err) {
+        console.error("Failed to fetch project members:", err);
+      }
+    };
+
+    fetchMembers();
+  }, [project, isTaskModalOpen]);
+
+  const handleTaskClick = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setIsTaskModalOpen(true);
+  };
+
+  const handleSaveDescription = async () => {
+    if (!project || !selectedTaskId) return;
+
+    try {
+      setSavingDescription(true);
+      await api.patch(
+        `/projects/${project.id}/tasks/${selectedTaskId}/description`,
+        {
+          description: description || null,
+        }
+      );
+      if (taskDetails) {
+        setTaskDetails({ ...taskDetails, description: description || null });
+      }
+      const projectResponse = await api.get<Project>(`/projects/${project.id}`);
+      setProject(projectResponse.data);
+    } catch (err) {
+      console.error("Failed to save description:", err);
+    } finally {
+      setSavingDescription(false);
+    }
+  };
+
+  const handleSaveAssignee = async (assigneeId: string | null) => {
+    if (!project || !selectedTaskId) return;
+
+    try {
+      setSavingAssignee(true);
+      const response = await api.patch<{
+        task: {
+          id: string;
+          assignee: { id: string; email: string; name: string | null } | null;
+        };
+      }>(`/projects/${project.id}/tasks/${selectedTaskId}/assignee`, {
+        assigneeId: assigneeId || null,
+      });
+      if (taskDetails) {
+        setTaskDetails({
+          ...taskDetails,
+          assignee: response.data.task.assignee,
+        });
+      }
+      const projectResponse = await api.get<Project>(`/projects/${project.id}`);
+      setProject(projectResponse.data);
+    } catch (err) {
+      console.error("Failed to save assignee:", err);
+    } finally {
+      setSavingAssignee(false);
+    }
+  };
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!project || !selectedTaskId || !commentContent.trim()) return;
+
+    try {
+      setAddingComment(true);
+      const response = await api.post<{
+        comment: {
+          id: string;
+          content: string;
+          author: { id: string; email: string; name: string | null };
+          createdAt: string;
+        };
+      }>(`/projects/${project.id}/tasks/${selectedTaskId}/comments`, {
+        content: commentContent,
+      });
+      if (taskDetails) {
+        setTaskDetails({
+          ...taskDetails,
+          comments: [...taskDetails.comments, response.data.comment],
+        });
+      }
+      setCommentContent("");
+    } catch (err) {
+      console.error("Failed to add comment:", err);
+    } finally {
+      setAddingComment(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -382,7 +561,6 @@ export default function ProjectPage() {
       if (!targetColumn || sourceColumn.id === targetColumn.id) return;
 
       try {
-        setUpdatingTask(taskId);
         const targetTasks = getTasksForColumn(
           targetColumn.tag.id,
           targetColumn.id
@@ -401,8 +579,6 @@ export default function ProjectPage() {
         setProject(projectResponse.data);
       } catch (err) {
         console.error("Failed to move task:", err);
-      } finally {
-        setUpdatingTask(null);
       }
     } else if (isOverTask) {
       const targetTask = project.tasks?.find((t) => t.id === overId);
@@ -425,8 +601,6 @@ export default function ProjectPage() {
       if (targetIndex === -1) return;
 
       try {
-        setUpdatingTask(taskId);
-
         if (isSameColumn) {
           const newTasks = arrayMove(
             columnTasks,
@@ -456,8 +630,6 @@ export default function ProjectPage() {
         setProject(projectResponse.data);
       } catch (err) {
         console.error("Failed to move task:", err);
-      } finally {
-        setUpdatingTask(null);
       }
     }
   };
@@ -628,6 +800,7 @@ export default function ProjectPage() {
                                   <SortableTask
                                     task={task}
                                     columnId={column.id}
+                                    onTaskClick={handleTaskClick}
                                   />
                                 </div>
                               ))
@@ -665,6 +838,122 @@ export default function ProjectPage() {
             </CardHeader>
           </Card>
         )}
+
+        <Sheet open={isTaskModalOpen} onOpenChange={setIsTaskModalOpen}>
+          <SheetContent
+            side="right"
+            className="w-full sm:max-w-2xl overflow-y-auto"
+          >
+            <SheetHeader>
+              <SheetTitle>
+                {loadingTaskDetails
+                  ? "Ładowanie..."
+                  : taskDetails
+                    ? `#${taskDetails.number} - ${taskDetails.title}`
+                    : "Szczegóły zadania"}
+              </SheetTitle>
+            </SheetHeader>
+            {loadingTaskDetails ? (
+              <div className="p-4">Ładowanie...</div>
+            ) : taskDetails ? (
+              <div className="space-y-6 p-4">
+                <div className="space-y-4">
+                  <div className="space-y-2 flex gap-6 items-center">
+                    <label className="text-sm font-medium">Przypisany do</label>
+                    <Select
+                      value={taskDetails.assignee?.id || "none"}
+                      onValueChange={(value) =>
+                        handleSaveAssignee(value === "none" ? null : value)
+                      }
+                      disabled={savingAssignee}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Wybierz osobę" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Brak</SelectItem>
+                        {projectMembers.map((member) => (
+                          <SelectItem
+                            key={member.user.id}
+                            value={member.user.id}
+                          >
+                            {member.user.name || member.user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex flex-col space-y-4">
+                    <label className="text-sm font-medium">Opis</label>
+                    <textarea
+                      className="w-full min-h-[100px] px-3 py-2 text-sm border rounded-md bg-transparent resize-y"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Dodaj opis zadania..."
+                    />
+                    <Button
+                      onClick={handleSaveDescription}
+                      disabled={savingDescription}
+                      size="sm"
+                      className="w-fit"
+                    >
+                      {savingDescription ? "Zapisywanie..." : "Zapisz opis"}
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium">Komentarze</label>
+                      <div className="mt-2 space-y-3">
+                        {taskDetails.comments.map((comment) => (
+                          <div
+                            key={comment.id}
+                            className="p-3 bg-muted rounded-md space-y-1"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">
+                                {comment.author.name || comment.author.email}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(comment.createdAt).toLocaleString(
+                                  "pl-PL"
+                                )}
+                              </span>
+                            </div>
+                            <p className="text-sm">{comment.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleAddComment} className="space-y-2">
+                      <textarea
+                        className="w-full min-h-[80px] px-3 py-2 text-sm border rounded-md bg-transparent resize-y"
+                        value={commentContent}
+                        onChange={(e) => setCommentContent(e.target.value)}
+                        placeholder="Dodaj komentarz..."
+                      />
+                      <Button
+                        type="submit"
+                        disabled={addingComment || !commentContent.trim()}
+                        size="sm"
+                      >
+                        {addingComment ? "Dodawanie..." : "Dodaj komentarz"}
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4">Brak danych</div>
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
     </ProtectedRoute>
   );

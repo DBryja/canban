@@ -134,7 +134,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       };
     }
   })
-  // Get project members (only admins) - must be before /:id route
+  // Get project members (admins and project members) - must be before /:id route
   .get("/:id/members", async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
@@ -150,14 +150,6 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
         select: { isAdmin: true },
       });
 
-      if (!user || !user.isAdmin) {
-        set.status = 403;
-        return {
-          error: "Forbidden",
-          message: "Only admins can view project members",
-        };
-      }
-
       // Verify project exists
       const project = await prisma.project.findUnique({
         where: { id },
@@ -169,6 +161,26 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
           error: "Not Found",
           message: "Project not found",
         };
+      }
+
+      // Check access: admin or project member
+      if (!user?.isAdmin) {
+        const membership = await prisma.projectMember.findUnique({
+          where: {
+            userId_projectId: {
+              userId,
+              projectId: id,
+            },
+          },
+        });
+
+        if (!membership) {
+          set.status = 403;
+          return {
+            error: "Forbidden",
+            message: "You don't have access to this project",
+          };
+        }
       }
 
       // Get all project members
@@ -780,6 +792,13 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
               creatorId: true,
               mainTagId: true,
               number: true,
+              assignee: {
+                select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                },
+              },
               tags: {
                 select: {
                   id: true,
@@ -1157,6 +1176,427 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
         fromColumnId: t.String(),
         toColumnId: t.String(),
         newOrder: t.Number(),
+      }),
+    }
+  )
+  // Get task details with comments and assignee
+  .get("/:id/tasks/:taskId", async ({ params, jwt, headers, set }) => {
+    const authResult = await requireAuth(jwt, headers, set);
+    if ("error" in authResult) {
+      return authResult;
+    }
+    const { userId } = authResult;
+    const { id: projectId, taskId } = params;
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true },
+      });
+
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+      });
+
+      if (!project) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Project not found",
+        };
+      }
+
+      if (!user?.isAdmin) {
+        const membership = await prisma.projectMember.findUnique({
+          where: {
+            userId_projectId: {
+              userId,
+              projectId,
+            },
+          },
+        });
+
+        if (!membership) {
+          set.status = 403;
+          return {
+            error: "Forbidden",
+            message: "You don't have access to this project",
+          };
+        }
+      }
+
+      const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        include: {
+          assignee: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+            },
+          },
+          comments: {
+            include: {
+              author: {
+                select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
+      });
+
+      if (!task || task.projectId !== projectId) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Task not found",
+        };
+      }
+
+      return {
+        task: {
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          number: task.number,
+          assignee: task.assignee,
+          comments: task.comments.map((comment) => ({
+            id: comment.id,
+            content: comment.content,
+            author: comment.author,
+            createdAt: comment.createdAt,
+          })),
+        },
+      };
+    } catch (err) {
+      set.status = 500;
+      return {
+        error: "Internal Server Error",
+        message: "Failed to fetch task",
+      };
+    }
+  })
+  // Update task description
+  .patch(
+    "/:id/tasks/:taskId/description",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId, taskId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership || membership.role !== "Maintainer") {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "Only maintainers can update tasks",
+            };
+          }
+        }
+
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+        });
+
+        if (!task || task.projectId !== projectId) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Task not found",
+          };
+        }
+
+        const updatedTask = await prisma.task.update({
+          where: { id: taskId },
+          data: {
+            description: body.description ?? null,
+          },
+          select: {
+            id: true,
+            description: true,
+          },
+        });
+
+        return {
+          task: updatedTask,
+          message: "Task description updated successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to update task description",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        description: t.Optional(t.String()),
+      }),
+    }
+  )
+  // Update task assignee
+  .patch(
+    "/:id/tasks/:taskId/assignee",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId, taskId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership || membership.role !== "Maintainer") {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "Only maintainers can update tasks",
+            };
+          }
+        }
+
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+        });
+
+        if (!task || task.projectId !== projectId) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Task not found",
+          };
+        }
+
+        if (body.assigneeId) {
+          const assignee = await prisma.user.findUnique({
+            where: { id: body.assigneeId },
+          });
+
+          if (!assignee) {
+            set.status = 404;
+            return {
+              error: "Not Found",
+              message: "Assignee not found",
+            };
+          }
+
+          const isProjectMember = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId: body.assigneeId,
+                projectId,
+              },
+            },
+          });
+
+          if (!isProjectMember && !user?.isAdmin) {
+            set.status = 400;
+            return {
+              error: "Bad Request",
+              message: "Assignee must be a project member",
+            };
+          }
+        }
+
+        const updatedTask = await prisma.task.update({
+          where: { id: taskId },
+          data: {
+            assigneeId: body.assigneeId ?? null,
+          },
+          include: {
+            assignee: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+              },
+            },
+          },
+        });
+
+        return {
+          task: {
+            id: updatedTask.id,
+            assignee: updatedTask.assignee,
+          },
+          message: "Task assignee updated successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to update task assignee",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        assigneeId: t.Optional(t.String()),
+      }),
+    }
+  )
+  // Create comment
+  .post(
+    "/:id/tasks/:taskId/comments",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId, taskId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership) {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "You don't have access to this project",
+            };
+          }
+        }
+
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+        });
+
+        if (!task || task.projectId !== projectId) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Task not found",
+          };
+        }
+
+        const comment = await prisma.comment.create({
+          data: {
+            content: body.content,
+            taskId: taskId,
+            authorId: userId,
+          },
+          include: {
+            author: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+              },
+            },
+          },
+        });
+
+        return {
+          comment: {
+            id: comment.id,
+            content: comment.content,
+            author: comment.author,
+            createdAt: comment.createdAt,
+          },
+          message: "Comment created successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to create comment",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        content: t.String({ minLength: 1 }),
       }),
     }
   );
