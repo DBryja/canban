@@ -1,5 +1,6 @@
 import { defineConfig } from "eslint/config";
 import prettierConfig from "eslint-config-prettier";
+import tseslintParser from "@typescript-eslint/parser";
 
 const eslintConfig = defineConfig([
   {
@@ -8,11 +9,14 @@ const eslintConfig = defineConfig([
   {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: "module",
+      parser: tseslintParser,
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: "module",
+      },
     },
     rules: {
-      "no-unused-vars": "warn",
+      "no-unused-vars": "off",
       "no-console": "warn",
     },
   },
