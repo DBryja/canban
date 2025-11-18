@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { randomBytes } from "crypto";
+import { connectQueue, publishEmail } from "../../../lib/queue";
 
 function generateInvitationToken() {
   return randomBytes(32).toString("hex");
@@ -68,6 +69,25 @@ export const postCreate = new Elysia().use(jwtPlugin).post(
         },
       });
 
+      const invitationLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/invitations/${invitation.token}`;
+
+      // Asynchroniczne wysyłanie emaila z zaproszeniem
+      if (body.email) {
+        try {
+          await connectQueue();
+          await publishEmail({
+            type: "invitation",
+            to: body.email,
+            subject: `Zaproszenie do projektu: ${invitation.project.name}`,
+            body: `Zostałeś zaproszony do projektu "${invitation.project.name}".\n\nKliknij poniższy link, aby dołączyć:\n${invitationLink}\n\nRola: ${invitation.role}\nWażność: ${expiresIn} godzin`,
+            invitationToken: invitation.token,
+            projectName: invitation.project.name,
+          });
+        } catch (error) {
+          console.error("Failed to queue invitation email:", error);
+        }
+      }
+
       return {
         invitation: {
           id: invitation.id,
@@ -77,7 +97,7 @@ export const postCreate = new Elysia().use(jwtPlugin).post(
           expiresAt: invitation.expiresAt,
           createdAt: invitation.createdAt,
         },
-        invitationLink: `/invitations/${invitation.token}`,
+        invitationLink,
         message: "Invitation created successfully",
       };
     } catch (err) {
@@ -93,6 +113,7 @@ export const postCreate = new Elysia().use(jwtPlugin).post(
       projectId: t.String(),
       role: t.Optional(t.Union([t.Literal("Guest"), t.Literal("Maintainer")])),
       expiresInHours: t.Optional(t.Number({ minimum: 1, maximum: 168 })),
+      email: t.Optional(t.String({ format: "email" })),
     }),
   }
 );

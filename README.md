@@ -7,7 +7,8 @@ TaskMaster to prosta aplikacja SaaS do zarządzania projektami i zadaniami. Uży
 - **Frontend:** Nextjs + shadcn/ui + TypeScript
 - **Backend:** Bun + Elysia + Prisma ORM + REST API
 - **Baza danych:** PostgreSQL (Docker)
-- **Uwierzytelnianie:** JWT + role użytkowników (do dodania)
+- **Kolejki:** RabbitMQ (Docker)
+- **Uwierzytelnianie:** JWT + role użytkowników
 
 ![Homepage](./labs/lab1/homepage.png)
 
@@ -21,11 +22,13 @@ TaskMaster to prosta aplikacja SaaS do zarządzania projektami i zadaniami. Uży
 
 ### Instalacja i uruchomienie
 
-1. **Uruchom bazę danych PostgreSQL w Dockerze:**
+1. **Uruchom bazę danych PostgreSQL i RabbitMQ w Dockerze:**
 
 ```bash
 docker-compose up -d
 ```
+
+RabbitMQ Management UI będzie dostępne na `http://localhost:15672` (login: `taskmaster`, hasło: `taskmaster`)
 
 2. **Skonfiguruj backend:**
 
@@ -45,7 +48,20 @@ bun run dev
 
 Backend będzie dostępny na `http://localhost:3001`
 
-4. **Skonfiguruj frontend:**
+4. **Uruchom workery do przetwarzania zadań z kolejek (w osobnych terminalach):**
+
+```bash
+# Wszystkie workery razem
+bun run worker
+
+# Lub osobno:
+bun run worker:email        # Worker do wysyłania emaili
+bun run worker:notification # Worker do powiadomień
+```
+
+**Uwaga:** Workery muszą być uruchomione, aby przetwarzać zadania z kolejek RabbitMQ.
+
+5. **Skonfiguruj frontend:**
 
 ```bash
 cd ../frontend
@@ -53,7 +69,7 @@ bun install  # lub npm install
 cp .env.example .env  # Edytuj .env i uzupełnij zmienne
 ```
 
-5. **Uruchom frontend:**
+6. **Uruchom frontend:**
 
 ```bash
 bun run dev  # lub npm run dev
@@ -90,6 +106,7 @@ canban/
 - **NextJS**: Framework z Reacta, pozwalajacy na łatwy routing i ssg + ssr
 - **shadcn/ui**: Komponenty UI oparte na Radix UI z pełną kontrolą nad kodem
 - **PostgreSQL**: Zaawansowana relacyjna baza danych z doskonałą wydajnością
+- **RabbitMQ**: Broker wiadomości do asynchronicznego przetwarzania zadań (wysyłanie emaili, powiadomienia)
 
 #### Kryteria
 

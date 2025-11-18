@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkMaintainerAccess, checkProjectAccess } from "./helpers";
+import { connectQueue, publishNotification } from "../../../lib/queue";
 
 export const patchTaskAssignee = new Elysia().use(jwtPlugin).patch(
   "/:id/tasks/:taskId/assignee",
@@ -86,7 +87,9 @@ export const patchTaskAssignee = new Elysia().use(jwtPlugin).patch(
         data: {
           assigneeId: body.assigneeId ?? null,
         },
-        include: {
+        select: {
+          id: true,
+          title: true,
           assignee: {
             select: {
               id: true,
@@ -94,8 +97,35 @@ export const patchTaskAssignee = new Elysia().use(jwtPlugin).patch(
               name: true,
             },
           },
+          project: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       });
+
+      // Asynchroniczne powiadomienie o przypisaniu zadania
+      if (body.assigneeId && updatedTask.assignee) {
+        try {
+          await connectQueue();
+          await publishNotification({
+            type: "task_assigned",
+            userId: body.assigneeId,
+            message: `Zostałeś przypisany do zadania "${updatedTask.title}" w projekcie "${updatedTask.project.name}"`,
+            taskId: taskId,
+            projectId: projectId,
+            metadata: {
+              taskTitle: updatedTask.title,
+              projectName: updatedTask.project.name,
+              assignedBy: userId,
+            },
+          });
+        } catch (error) {
+          console.error("Failed to queue task assignment notification:", error);
+        }
+      }
 
       return {
         task: {

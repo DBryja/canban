@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkProjectAccess } from "./helpers";
+import { connectQueue, publishNotification } from "../../../lib/queue";
 
 export const postTaskComment = new Elysia().use(jwtPlugin).post(
   "/:id/tasks/:taskId/comments",
@@ -59,8 +60,78 @@ export const postTaskComment = new Elysia().use(jwtPlugin).post(
               name: true,
             },
           },
+          task: {
+            select: {
+              id: true,
+              title: true,
+              assigneeId: true,
+              project: {
+                select: {
+                  id: true,
+                  name: true,
+                  members: {
+                    select: {
+                      userId: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       });
+
+      // Asynchroniczne powiadomienia o nowym komentarzu
+      // Powiadomiamy przypisanego użytkownika (jeśli istnieje) oraz innych członków projektu
+      try {
+        await connectQueue();
+
+        const notifiedUserIds = new Set<string>();
+
+        // Powiadomienie dla przypisanego użytkownika (jeśli nie jest autorem komentarza)
+        if (comment.task.assigneeId && comment.task.assigneeId !== userId) {
+          notifiedUserIds.add(comment.task.assigneeId);
+          await publishNotification({
+            type: "task_comment",
+            userId: comment.task.assigneeId,
+            message: `${comment.author.name || comment.author.email} dodał komentarz do zadania "${comment.task.title}"`,
+            taskId: taskId,
+            projectId: projectId,
+            metadata: {
+              taskTitle: comment.task.title,
+              projectName: comment.task.project.name,
+              commentAuthor: comment.author.name || comment.author.email,
+              commentPreview: comment.content.substring(0, 100),
+            },
+          });
+        }
+
+        // Powiadomienia dla innych członków projektu (oprócz autora i przypisanego)
+        for (const member of comment.task.project.members) {
+          if (
+            member.userId !== userId &&
+            member.userId !== comment.task.assigneeId &&
+            !notifiedUserIds.has(member.userId)
+          ) {
+            notifiedUserIds.add(member.userId);
+            await publishNotification({
+              type: "task_comment",
+              userId: member.userId,
+              message: `${comment.author.name || comment.author.email} dodał komentarz do zadania "${comment.task.title}" w projekcie "${comment.task.project.name}"`,
+              taskId: taskId,
+              projectId: projectId,
+              metadata: {
+                taskTitle: comment.task.title,
+                projectName: comment.task.project.name,
+                commentAuthor: comment.author.name || comment.author.email,
+                commentPreview: comment.content.substring(0, 100),
+              },
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Failed to queue comment notifications:", error);
+      }
 
       return {
         comment: {
