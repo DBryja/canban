@@ -12,8 +12,30 @@ export interface Project {
   };
   tasks?: Array<{
     id: string;
+    number: number | null;
     title: string;
     description: string | null;
+    tags?: Array<{
+      id: string;
+      name: string;
+      color: string | null;
+    }>;
+    columnOrders?: Array<{
+      id: string;
+      columnId: string;
+      order: number;
+    }>;
+  }>;
+  columns?: Array<{
+    id: string;
+    projectId: string;
+    tagId: string;
+    order: number;
+    tag: {
+      id: string;
+      name: string;
+      color: string | null;
+    };
   }>;
 }
 

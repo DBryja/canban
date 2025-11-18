@@ -134,7 +134,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       };
     }
   })
-  // Get project members (only admins) - must be before /:id route
+  // Get project members (admins and project members) - must be before /:id route
   .get("/:id/members", async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
@@ -150,14 +150,6 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
         select: { isAdmin: true },
       });
 
-      if (!user || !user.isAdmin) {
-        set.status = 403;
-        return {
-          error: "Forbidden",
-          message: "Only admins can view project members",
-        };
-      }
-
       // Verify project exists
       const project = await prisma.project.findUnique({
         where: { id },
@@ -169,6 +161,26 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
           error: "Not Found",
           message: "Project not found",
         };
+      }
+
+      // Check access: admin or project member
+      if (!user?.isAdmin) {
+        const membership = await prisma.projectMember.findUnique({
+          where: {
+            userId_projectId: {
+              userId,
+              projectId: id,
+            },
+          },
+        });
+
+        if (!membership) {
+          set.status = 403;
+          return {
+            error: "Forbidden",
+            message: "You don't have access to this project",
+          };
+        }
       }
 
       // Get all project members
@@ -371,6 +383,381 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       };
     }
   })
+  // Get project columns - must be before /:id route
+  .get("/:id/columns", async ({ params, jwt, headers, set }) => {
+    const authResult = await requireAuth(jwt, headers, set);
+    if ("error" in authResult) {
+      return authResult;
+    }
+    const { userId } = authResult;
+    const { id } = params;
+
+    try {
+      // Check if user has access to this project
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true },
+      });
+
+      const project = await prisma.project.findUnique({
+        where: { id },
+      });
+
+      if (!project) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Project not found",
+        };
+      }
+
+      // Check access: admin or project member
+      if (!user?.isAdmin) {
+        const membership = await prisma.projectMember.findUnique({
+          where: {
+            userId_projectId: {
+              userId,
+              projectId: id,
+            },
+          },
+        });
+
+        if (!membership) {
+          set.status = 403;
+          return {
+            error: "Forbidden",
+            message: "You don't have access to this project",
+          };
+        }
+      }
+
+      const columns = await prisma.projectColumn.findMany({
+        where: { projectId: id },
+        include: {
+          tag: {
+            select: {
+              id: true,
+              name: true,
+              color: true,
+            },
+          },
+        },
+        orderBy: {
+          order: "asc",
+        },
+      });
+
+      return { columns };
+    } catch (err) {
+      set.status = 500;
+      return {
+        error: "Internal Server Error",
+        message: "Failed to fetch project columns",
+      };
+    }
+  })
+  // Create project column - must be before /:id route
+  .post(
+    "/:id/columns",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id } = params;
+
+      try {
+        // Check if user is admin or maintainer
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        // Check access: admin or maintainer
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId: id,
+              },
+            },
+          });
+
+          if (!membership || membership.role !== "Maintainer") {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "Only admins and maintainers can manage columns",
+            };
+          }
+        }
+
+        // Verify tag exists
+        const tag = await prisma.taskTag.findUnique({
+          where: { id: body.tagId },
+        });
+
+        if (!tag) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Tag not found",
+          };
+        }
+
+        // Check if column with this tag already exists
+        const existingColumn = await prisma.projectColumn.findUnique({
+          where: {
+            projectId_tagId: {
+              projectId: id,
+              tagId: body.tagId,
+            },
+          },
+        });
+
+        if (existingColumn) {
+          set.status = 400;
+          return {
+            error: "Bad Request",
+            message: "Column with this tag already exists",
+          };
+        }
+
+        // Get max order for this project
+        const maxOrderColumn = await prisma.projectColumn.findFirst({
+          where: { projectId: id },
+          orderBy: { order: "desc" },
+        });
+
+        const newOrder = maxOrderColumn ? maxOrderColumn.order + 1 : 0;
+
+        const column = await prisma.projectColumn.create({
+          data: {
+            projectId: id,
+            tagId: body.tagId,
+            order: body.order !== undefined ? body.order : newOrder,
+          },
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        });
+
+        return {
+          column,
+          message: "Column created successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to create column",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        tagId: t.String(),
+        order: t.Optional(t.Number()),
+      }),
+    }
+  )
+  // Update project column order - must be before /:id route
+  .patch(
+    "/:id/columns/:columnId",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id, columnId } = params;
+
+      try {
+        // Check if user is admin or maintainer
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        // Check access: admin or maintainer
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId: id,
+              },
+            },
+          });
+
+          if (!membership || membership.role !== "Maintainer") {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "Only admins and maintainers can manage columns",
+            };
+          }
+        }
+
+        // Verify column exists and belongs to this project
+        const column = await prisma.projectColumn.findUnique({
+          where: { id: columnId },
+        });
+
+        if (!column || column.projectId !== id) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Column not found",
+          };
+        }
+
+        // Update column
+        const updatedColumn = await prisma.projectColumn.update({
+          where: { id: columnId },
+          data: {
+            order: body.order !== undefined ? body.order : column.order,
+            tagId: body.tagId !== undefined ? body.tagId : column.tagId,
+          },
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        });
+
+        return {
+          column: updatedColumn,
+          message: "Column updated successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to update column",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        order: t.Optional(t.Number()),
+        tagId: t.Optional(t.String()),
+      }),
+    }
+  )
+  // Delete project column - must be before /:id route
+  .delete("/:id/columns/:columnId", async ({ params, jwt, headers, set }) => {
+    const authResult = await requireAuth(jwt, headers, set);
+    if ("error" in authResult) {
+      return authResult;
+    }
+    const { userId } = authResult;
+    const { id, columnId } = params;
+
+    try {
+      // Check if user is admin or maintainer
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true },
+      });
+
+      const project = await prisma.project.findUnique({
+        where: { id },
+      });
+
+      if (!project) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Project not found",
+        };
+      }
+
+      // Check access: admin or maintainer
+      if (!user?.isAdmin) {
+        const membership = await prisma.projectMember.findUnique({
+          where: {
+            userId_projectId: {
+              userId,
+              projectId: id,
+            },
+          },
+        });
+
+        if (!membership || membership.role !== "Maintainer") {
+          set.status = 403;
+          return {
+            error: "Forbidden",
+            message: "Only admins and maintainers can manage columns",
+          };
+        }
+      }
+
+      // Verify column exists and belongs to this project
+      const column = await prisma.projectColumn.findUnique({
+        where: { id: columnId },
+      });
+
+      if (!column || column.projectId !== id) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Column not found",
+        };
+      }
+
+      // Delete column
+      await prisma.projectColumn.delete({
+        where: { id: columnId },
+      });
+
+      return {
+        message: "Column deleted successfully",
+      };
+    } catch (err) {
+      set.status = 500;
+      return {
+        error: "Internal Server Error",
+        message: "Failed to delete column",
+      };
+    }
+  })
   .get("/:id", async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
@@ -404,6 +791,14 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
               projectId: true,
               creatorId: true,
               mainTagId: true,
+              number: true,
+              assignee: {
+                select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                },
+              },
               tags: {
                 select: {
                   id: true,
@@ -425,6 +820,27 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
                   email: true,
                 },
               },
+              columnOrders: {
+                select: {
+                  id: true,
+                  columnId: true,
+                  order: true,
+                },
+              },
+            },
+          },
+          columns: {
+            include: {
+              tag: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
+                },
+              },
+            },
+            orderBy: {
+              order: "asc",
             },
           },
         },
@@ -464,6 +880,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
         description: project.description,
         creator: project.creator,
         tasks: project.tasks,
+        columns: project.columns,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
       };
@@ -474,4 +891,1008 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
         message: "Failed to fetch project",
       };
     }
-  });
+  })
+  // Reorder tasks within a column
+  .patch(
+    "/:id/tasks/reorder",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership || membership.role !== "Maintainer") {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "Only maintainers can reorder tasks",
+            };
+          }
+        }
+
+        const { columnId, taskOrders } = body;
+
+        const column = await prisma.projectColumn.findUnique({
+          where: { id: columnId },
+        });
+
+        if (!column || column.projectId !== projectId) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Column not found",
+          };
+        }
+
+        const taskIds = [];
+        for (const taskOrder of taskOrders) {
+          taskIds.push(taskOrder.taskId);
+        }
+
+        const tasks = await prisma.task.findMany({
+          where: {
+            id: { in: taskIds },
+            projectId: projectId,
+          },
+        });
+
+        if (tasks.length !== taskIds.length) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message:
+              "One or more tasks not found or do not belong to this project",
+          };
+        }
+
+        const updatePromises = [];
+        for (const taskOrder of taskOrders) {
+          updatePromises.push(
+            prisma.taskColumnOrder.upsert({
+              where: {
+                taskId_columnId: {
+                  taskId: taskOrder.taskId,
+                  columnId: columnId,
+                },
+              },
+              update: {
+                order: taskOrder.order,
+              },
+              create: {
+                taskId: taskOrder.taskId,
+                columnId: columnId,
+                order: taskOrder.order,
+              },
+            })
+          );
+        }
+        await Promise.all(updatePromises);
+
+        return {
+          message: "Tasks reordered successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to reorder tasks",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        columnId: t.String(),
+        taskOrders: t.Array(
+          t.Object({
+            taskId: t.String(),
+            order: t.Number(),
+          })
+        ),
+      }),
+    }
+  )
+  // Move task between columns (change tags)
+  .patch(
+    "/:id/tasks/:taskId/move",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId, taskId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership || membership.role !== "Maintainer") {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "Only maintainers can move tasks",
+            };
+          }
+        }
+
+        const { fromColumnId, toColumnId, newOrder } = body;
+
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+          include: {
+            tags: true,
+            columnOrders: true,
+          },
+        });
+
+        if (!task || task.projectId !== projectId) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Task not found",
+          };
+        }
+
+        const fromColumn = await prisma.projectColumn.findUnique({
+          where: { id: fromColumnId },
+        });
+
+        const toColumn = await prisma.projectColumn.findUnique({
+          where: { id: toColumnId },
+        });
+
+        if (
+          !fromColumn ||
+          !toColumn ||
+          fromColumn.projectId !== projectId ||
+          toColumn.projectId !== projectId
+        ) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Column not found",
+          };
+        }
+
+        const fromTag = fromColumn.tagId;
+        const toTag = toColumn.tagId;
+
+        const hasFromTag = task.tags.some((tag) => tag.id === fromTag);
+        const hasToTag = task.tags.some((tag) => tag.id === toTag);
+
+        if (!hasFromTag) {
+          set.status = 400;
+          return {
+            error: "Bad Request",
+            message: "Task does not have the source column tag",
+          };
+        }
+
+        const tagIdsToUpdate = [...task.tags.map((tag) => tag.id)];
+
+        if (!hasToTag) {
+          tagIdsToUpdate.push(toTag);
+        }
+
+        if (fromTag !== toTag) {
+          tagIdsToUpdate.splice(tagIdsToUpdate.indexOf(fromTag), 1);
+        }
+
+        await prisma.$transaction([
+          prisma.task.update({
+            where: { id: taskId },
+            data: {
+              tags: {
+                set: tagIdsToUpdate.map((tagId) => ({ id: tagId })),
+              },
+            },
+          }),
+          prisma.taskColumnOrder.deleteMany({
+            where: {
+              taskId: taskId,
+              columnId: fromColumnId,
+            },
+          }),
+          prisma.taskColumnOrder.upsert({
+            where: {
+              taskId_columnId: {
+                taskId: taskId,
+                columnId: toColumnId,
+              },
+            },
+            update: {
+              order: newOrder,
+            },
+            create: {
+              taskId: taskId,
+              columnId: toColumnId,
+              order: newOrder,
+            },
+          }),
+        ]);
+
+        const tasksInToColumn = await prisma.taskColumnOrder.findMany({
+          where: {
+            columnId: toColumnId,
+            taskId: { not: taskId },
+            order: { gte: newOrder },
+          },
+        });
+
+        if (tasksInToColumn.length > 0) {
+          await Promise.all(
+            tasksInToColumn.map((taskOrder) =>
+              prisma.taskColumnOrder.update({
+                where: { id: taskOrder.id },
+                data: { order: taskOrder.order + 1 },
+              })
+            )
+          );
+        }
+
+        return {
+          message: "Task moved successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to move task",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        fromColumnId: t.String(),
+        toColumnId: t.String(),
+        newOrder: t.Number(),
+      }),
+    }
+  )
+  // Create task
+  .post(
+    "/:id/tasks",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership) {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "You don't have access to this project",
+            };
+          }
+        }
+
+        // Get the next task number for this project
+        const maxTask = await prisma.task.findFirst({
+          where: { projectId },
+          orderBy: { number: "desc" },
+        });
+
+        const nextNumber = maxTask ? maxTask.number + 1 : 1;
+
+        // Get the first column's tag if columnId is provided, otherwise use mainTagId
+        let mainTagId = body.mainTagId || null;
+        let columnTagId = null;
+        if (body.columnId && !mainTagId) {
+          const column = await prisma.projectColumn.findUnique({
+            where: { id: body.columnId },
+          });
+          if (column && column.projectId === projectId) {
+            mainTagId = column.tagId;
+            columnTagId = column.tagId;
+          }
+        }
+
+        // Prepare tag IDs - include column tag if provided
+        const tagIdsToConnect = body.tagIds ? [...body.tagIds] : [];
+        if (columnTagId && !tagIdsToConnect.includes(columnTagId)) {
+          tagIdsToConnect.push(columnTagId);
+        }
+
+        const task = await prisma.task.create({
+          data: {
+            title: body.title,
+            description: body.description || null,
+            projectId,
+            creatorId: userId,
+            number: nextNumber,
+            mainTagId,
+            tags:
+              tagIdsToConnect.length > 0
+                ? {
+                    connect: tagIdsToConnect.map((tagId) => ({
+                      id: tagId,
+                    })),
+                  }
+                : undefined,
+          },
+          include: {
+            tags: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+            assignee: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+              },
+            },
+            columnOrders: {
+              select: {
+                id: true,
+                columnId: true,
+                order: true,
+              },
+            },
+          },
+        });
+
+        // If columnId is provided, add task to that column
+        if (body.columnId) {
+          const column = await prisma.projectColumn.findUnique({
+            where: { id: body.columnId },
+          });
+
+          if (column && column.projectId === projectId) {
+            // Get existing tasks in this column to determine order
+            const existingOrders = await prisma.taskColumnOrder.findMany({
+              where: { columnId: body.columnId },
+              orderBy: { order: "desc" },
+              take: 1,
+            });
+
+            const newOrder =
+              existingOrders.length > 0 ? existingOrders[0].order + 1 : 0;
+
+            await prisma.taskColumnOrder.create({
+              data: {
+                taskId: task.id,
+                columnId: body.columnId,
+                order: newOrder,
+              },
+            });
+          }
+        }
+
+        return {
+          task: {
+            id: task.id,
+            number: task.number,
+            title: task.title,
+            description: task.description,
+            assignee: task.assignee,
+            tags: task.tags,
+            columnOrders: task.columnOrders,
+          },
+          message: "Task created successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to create task",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        title: t.String({ minLength: 1 }),
+        description: t.Optional(t.String()),
+        mainTagId: t.Optional(t.String()),
+        tagIds: t.Optional(t.Array(t.String())),
+        columnId: t.Optional(t.String()),
+      }),
+    }
+  )
+  // Get task details with comments and assignee
+  .get("/:id/tasks/:taskId", async ({ params, jwt, headers, set }) => {
+    const authResult = await requireAuth(jwt, headers, set);
+    if ("error" in authResult) {
+      return authResult;
+    }
+    const { userId } = authResult;
+    const { id: projectId, taskId } = params;
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true },
+      });
+
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+      });
+
+      if (!project) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Project not found",
+        };
+      }
+
+      if (!user?.isAdmin) {
+        const membership = await prisma.projectMember.findUnique({
+          where: {
+            userId_projectId: {
+              userId,
+              projectId,
+            },
+          },
+        });
+
+        if (!membership) {
+          set.status = 403;
+          return {
+            error: "Forbidden",
+            message: "You don't have access to this project",
+          };
+        }
+      }
+
+      const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        include: {
+          assignee: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+            },
+          },
+          comments: {
+            include: {
+              author: {
+                select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
+      });
+
+      if (!task || task.projectId !== projectId) {
+        set.status = 404;
+        return {
+          error: "Not Found",
+          message: "Task not found",
+        };
+      }
+
+      return {
+        task: {
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          number: task.number,
+          assignee: task.assignee,
+          comments: task.comments.map((comment) => ({
+            id: comment.id,
+            content: comment.content,
+            author: comment.author,
+            createdAt: comment.createdAt,
+          })),
+        },
+      };
+    } catch (err) {
+      set.status = 500;
+      return {
+        error: "Internal Server Error",
+        message: "Failed to fetch task",
+      };
+    }
+  })
+  // Update task description
+  .patch(
+    "/:id/tasks/:taskId/description",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId, taskId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership || membership.role !== "Maintainer") {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "Only maintainers can update tasks",
+            };
+          }
+        }
+
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+        });
+
+        if (!task || task.projectId !== projectId) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Task not found",
+          };
+        }
+
+        const updatedTask = await prisma.task.update({
+          where: { id: taskId },
+          data: {
+            description: body.description ?? null,
+          },
+          select: {
+            id: true,
+            description: true,
+          },
+        });
+
+        return {
+          task: updatedTask,
+          message: "Task description updated successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to update task description",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        description: t.Optional(t.String()),
+      }),
+    }
+  )
+  // Update task assignee
+  .patch(
+    "/:id/tasks/:taskId/assignee",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId, taskId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership || membership.role !== "Maintainer") {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "Only maintainers can update tasks",
+            };
+          }
+        }
+
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+        });
+
+        if (!task || task.projectId !== projectId) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Task not found",
+          };
+        }
+
+        if (body.assigneeId) {
+          const assignee = await prisma.user.findUnique({
+            where: { id: body.assigneeId },
+          });
+
+          if (!assignee) {
+            set.status = 404;
+            return {
+              error: "Not Found",
+              message: "Assignee not found",
+            };
+          }
+
+          const isProjectMember = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId: body.assigneeId,
+                projectId,
+              },
+            },
+          });
+
+          if (!isProjectMember && !user?.isAdmin) {
+            set.status = 400;
+            return {
+              error: "Bad Request",
+              message: "Assignee must be a project member",
+            };
+          }
+        }
+
+        const updatedTask = await prisma.task.update({
+          where: { id: taskId },
+          data: {
+            assigneeId: body.assigneeId ?? null,
+          },
+          include: {
+            assignee: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+              },
+            },
+          },
+        });
+
+        return {
+          task: {
+            id: updatedTask.id,
+            assignee: updatedTask.assignee,
+          },
+          message: "Task assignee updated successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to update task assignee",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        assigneeId: t.Optional(t.String()),
+      }),
+    }
+  )
+  // Update task tags
+  .patch(
+    "/:id/tasks/:taskId/tags",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId, taskId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership) {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "You don't have access to this project",
+            };
+          }
+        }
+
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+        });
+
+        if (!task || task.projectId !== projectId) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Task not found",
+          };
+        }
+
+        // Verify all tag IDs exist
+        if (body.tagIds && body.tagIds.length > 0) {
+          const existingTags = await prisma.taskTag.findMany({
+            where: {
+              id: {
+                in: body.tagIds,
+              },
+            },
+          });
+
+          if (existingTags.length !== body.tagIds.length) {
+            set.status = 400;
+            return {
+              error: "Bad Request",
+              message: "One or more tags not found",
+            };
+          }
+        }
+
+        const tagIdsToSet = [];
+        for (const tagId of body.tagIds) {
+          tagIdsToSet.push({ id: tagId });
+        }
+        const updatedTask = await prisma.task.update({
+          where: { id: taskId },
+          data: {
+            tags: {
+              set: tagIdsToSet,
+            },
+          },
+          include: {
+            tags: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        });
+
+        return {
+          task: {
+            id: updatedTask.id,
+            tags: updatedTask.tags,
+          },
+          message: "Task tags updated successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to update task tags",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        tagIds: t.Array(t.String()),
+      }),
+    }
+  )
+  // Create comment
+  .post(
+    "/:id/tasks/:taskId/comments",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId, taskId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership) {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "You don't have access to this project",
+            };
+          }
+        }
+
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+        });
+
+        if (!task || task.projectId !== projectId) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Task not found",
+          };
+        }
+
+        const comment = await prisma.comment.create({
+          data: {
+            content: body.content,
+            taskId: taskId,
+            authorId: userId,
+          },
+          include: {
+            author: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+              },
+            },
+          },
+        });
+
+        return {
+          comment: {
+            id: comment.id,
+            content: comment.content,
+            author: comment.author,
+            createdAt: comment.createdAt,
+          },
+          message: "Comment created successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to create comment",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        content: t.String({ minLength: 1 }),
+      }),
+    }
+  );

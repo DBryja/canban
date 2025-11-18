@@ -21,6 +21,8 @@ model User {
   createdProjects Project[]        @relation("ProjectCreator")
   projectMembers  ProjectMember[]  // User's memberships in projects
   createdTasks    Task[]           @relation("TaskCreator")
+  assignedTasks   Task[]           @relation("TaskAssignee")
+  comments        Comment[]
 
   @@index([isAdmin])
 }
@@ -39,6 +41,7 @@ model Project {
   members         ProjectMember[]   // Project members with roles
   tasks           Task[]
   invitations     ProjectInvitation[]
+  columns         ProjectColumn[]   // Project columns for kanban board
 
   @@index([creatorId])
 }
@@ -77,6 +80,7 @@ model TaskTag {
   // Relations
   tasks        Task[]          @relation("TaskTags")
   mainTagTasks Task[]          @relation("TaskMainTag")
+  columns      ProjectColumn[] // Columns that use this tag
 
   @@index([name])
 }
@@ -88,7 +92,9 @@ model Task {
   description String?
   projectId   String
   creatorId   String
+  assigneeId  String?   // User assigned to this task
   mainTagId   String?   // Main tag for grouping
+  number      Int       // Task number within project (starts from 1)
   date        DateTime? // Optional date
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -96,11 +102,16 @@ model Task {
   // Relations
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   creator     User      @relation("TaskCreator", fields: [creatorId], references: [id])
+  assignee    User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
   mainTag     TaskTag?  @relation("TaskMainTag", fields: [mainTagId], references: [id])
   tags        TaskTag[] @relation("TaskTags")
+  columnOrders TaskColumnOrder[] // Task orders in columns
+  comments    Comment[]
 
+  @@unique([projectId, number]) // Task number must be unique within project
   @@index([projectId])
   @@index([creatorId])
+  @@index([assigneeId])
   @@index([mainTagId])
   @@index([date])
 }
@@ -124,3 +135,58 @@ model ProjectInvitation {
   @@index([expiresAt])
 }
 
+// ProjectColumn model - columns for kanban board linked to tags
+model ProjectColumn {
+  id        String   @id @default(cuid())
+  projectId String
+  tagId     String   // Tag that defines this column
+  order     Int      // Order of column in the board
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tag       TaskTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  taskOrders TaskColumnOrder[] // Task orders within this column
+
+  @@unique([projectId, tagId]) // One tag can only be used once per project
+  @@index([projectId])
+  @@index([tagId])
+  @@index([projectId, order]) // For ordering columns within a project
+}
+
+// TaskColumnOrder model - stores task order within columns
+model TaskColumnOrder {
+  id        String   @id @default(cuid())
+  taskId    String
+  columnId  String   // ProjectColumn id
+  order     Int      // Order of task within the column
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  column    ProjectColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, columnId]) // One task can only have one order per column
+  @@index([taskId])
+  @@index([columnId])
+  @@index([columnId, order]) // For ordering tasks within a column
+}
+
+// Comment model - comments on tasks
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  taskId    String
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+
+  @@index([taskId])
+  @@index([authorId])
+}
