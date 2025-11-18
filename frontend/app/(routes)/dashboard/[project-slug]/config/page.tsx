@@ -2,6 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import {
@@ -51,6 +68,99 @@ interface ProjectColumn {
   tagId: string;
   order: number;
   tag: TaskTag;
+}
+
+interface SortableColumnItemProps {
+  column: ProjectColumn;
+  index: number;
+  columns: ProjectColumn[];
+  updatingOrder: string | null;
+  deletingColumn: string | null;
+  onMove: (columnId: string, direction: "up" | "down") => void;
+  onDelete: (columnId: string) => void;
+}
+
+function SortableColumnItem({
+  column,
+  index,
+  columns,
+  updatingOrder,
+  deletingColumn,
+  onMove,
+  onDelete,
+}: SortableColumnItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: column.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center justify-between p-3 border rounded-lg bg-background"
+    >
+      <div className="flex items-center gap-3 flex-1">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing touch-none"
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+        <div className="flex items-center gap-2">
+          {column.tag.color && (
+            <span
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: column.tag.color }}
+            />
+          )}
+          <span className="text-sm font-medium">{column.tag.name}</span>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          (Kolejność: {column.order})
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onMove(column.id, "up")}
+          disabled={updatingOrder === column.id || index === 0}
+          title="Przenieś w górę"
+        >
+          <ArrowUp className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onMove(column.id, "down")}
+          disabled={updatingOrder === column.id || index === columns.length - 1}
+          title="Przenieś w dół"
+        >
+          <ArrowDown className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => onDelete(column.id)}
+          disabled={deletingColumn === column.id}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export default function ProjectConfigPage() {
@@ -204,6 +314,63 @@ export default function ProjectConfigPage() {
     }
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!project || !over || active.id === over.id) return;
+
+    const oldIndex = columns.findIndex((col) => col.id === active.id);
+    const newIndex = columns.findIndex((col) => col.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+    const newColumns = arrayMove(columns, oldIndex, newIndex);
+    setColumns(newColumns);
+
+    try {
+      setUpdatingOrder(active.id as string);
+
+      const updates = newColumns.map((column, index) => ({
+        id: column.id,
+        order: index,
+      }));
+
+      await Promise.all(
+        updates.map((update) =>
+          api.patch(`/projects/${project.id}/columns/${update.id}`, {
+            order: update.order,
+          })
+        )
+      );
+
+      const columnsResponse = await api.get<{ columns: ProjectColumn[] }>(
+        `/projects/${project.id}/columns`
+      );
+      const sortedColumns = columnsResponse.data.columns.sort(
+        (a, b) => a.order - b.order
+      );
+      setColumns(sortedColumns);
+    } catch (err) {
+      console.error("Failed to move column:", err);
+      const columnsResponse = await api.get<{ columns: ProjectColumn[] }>(
+        `/projects/${project.id}/columns`
+      );
+      const sortedColumns = columnsResponse.data.columns.sort(
+        (a, b) => a.order - b.order
+      );
+      setColumns(sortedColumns);
+    } finally {
+      setUpdatingOrder(null);
+    }
+  };
+
   const handleMoveColumn = async (
     columnId: string,
     direction: "up" | "down"
@@ -331,7 +498,8 @@ export default function ProjectConfigPage() {
                 <CardTitle>Kolumny kanban</CardTitle>
                 <CardDescription className="w-3/4">
                   Zarządzaj kolumnami wyświetlanymi na tablicy kanban projektu.
-                  Użyj przycisków strzałek, aby zmienić kolejność kolumn.
+                  Przeciągnij kolumny, aby zmienić ich kolejność lub użyj
+                  przycisków strzałek.
                 </CardDescription>
               </div>
               <Sheet
@@ -411,63 +579,31 @@ export default function ProjectConfigPage() {
                 kanban.
               </p>
             ) : (
-              <div className="space-y-3">
-                {columns.map((column, index) => (
-                  <div
-                    key={column.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex items-center gap-2">
-                        {column.tag.color && (
-                          <span
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: column.tag.color }}
-                          />
-                        )}
-                        <span className="text-sm font-medium">
-                          {column.tag.name}
-                        </span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        (Kolejność: {column.order})
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleMoveColumn(column.id, "up")}
-                        disabled={updatingOrder === column.id || index === 0}
-                        title="Przenieś w górę"
-                      >
-                        <ArrowUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleMoveColumn(column.id, "down")}
-                        disabled={
-                          updatingOrder === column.id ||
-                          index === columns.length - 1
-                        }
-                        title="Przenieś w dół"
-                      >
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteColumn(column.id)}
-                        disabled={deletingColumn === column.id}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={columns.map((col) => col.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {columns.map((column, index) => (
+                      <SortableColumnItem
+                        key={column.id}
+                        column={column}
+                        index={index}
+                        columns={columns}
+                        updatingOrder={updatingOrder}
+                        deletingColumn={deletingColumn}
+                        onMove={handleMoveColumn}
+                        onDelete={handleDeleteColumn}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             )}
           </CardContent>
         </Card>
