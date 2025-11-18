@@ -2,10 +2,11 @@ import { Elysia } from "elysia";
 import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
+import { ProjectsListResponse, ErrorResponse } from "../schemas";
 
-export const getList = new Elysia()
-  .use(jwtPlugin)
-  .get("/", async ({ jwt, headers, set }) => {
+export const getList = new Elysia().use(jwtPlugin).get(
+  "/",
+  async ({ jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
       return authResult;
@@ -68,4 +69,15 @@ export const getList = new Elysia()
         message: "Failed to fetch projects",
       };
     }
-  });
+  },
+  {
+    response: {
+      200: ProjectsListResponse,
+      401: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
+  }
+);

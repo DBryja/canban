@@ -2,10 +2,11 @@ import { Elysia } from "elysia";
 import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
+import { UserResponse, ErrorResponse } from "../schemas";
 
-export const getMe = new Elysia()
-  .use(jwtPlugin)
-  .get("/me", async ({ jwt, headers, set }) => {
+export const getMe = new Elysia().use(jwtPlugin).get(
+  "/me",
+  async ({ jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
       return authResult;
@@ -42,4 +43,15 @@ export const getMe = new Elysia()
     return {
       user,
     };
-  });
+  },
+  {
+    response: {
+      200: UserResponse,
+      401: ErrorResponse,
+      404: ErrorResponse,
+    },
+    detail: {
+      tags: ["auth"],
+    },
+  }
+);

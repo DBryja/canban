@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { hashPassword } from "../../../lib/auth";
+import { AuthSuccessResponse, ErrorResponse } from "../schemas";
 
 export const postRegister = new Elysia().use(jwtPlugin).post(
   "/register",
@@ -61,5 +62,13 @@ export const postRegister = new Elysia().use(jwtPlugin).post(
       password: t.String({ minLength: 6 }),
       name: t.Optional(t.String()),
     }),
+    response: {
+      200: AuthSuccessResponse,
+      400: ErrorResponse,
+      409: ErrorResponse,
+    },
+    detail: {
+      tags: ["auth"],
+    },
   }
 );

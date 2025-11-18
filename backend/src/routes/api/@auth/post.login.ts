@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { verifyPassword } from "../../../lib/auth";
+import { AuthSuccessResponse, ErrorResponse, UserSchema } from "../schemas";
 
 export const postLogin = new Elysia().use(jwtPlugin).post(
   "/login",
@@ -59,5 +60,13 @@ export const postLogin = new Elysia().use(jwtPlugin).post(
       email: t.String({ format: "email" }),
       password: t.String(),
     }),
+    response: {
+      200: AuthSuccessResponse,
+      400: ErrorResponse,
+      401: ErrorResponse,
+    },
+    detail: {
+      tags: ["auth"],
+    },
   }
 );

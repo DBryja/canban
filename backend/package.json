@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@elysiajs/jwt": "^1.1.1",
+    "@elysiajs/openapi": "^1.4.11",
     "@prisma/client": "^6.19.0",
     "@types/node": "^24.9.2",
     "@typescript-eslint/parser": "^8.47.0",

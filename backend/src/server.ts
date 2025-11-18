@@ -1,8 +1,27 @@
 import { Elysia } from "elysia";
+import { openapi } from "@elysiajs/openapi";
 import { prisma } from "./lib/prisma";
 import { routes } from "./routes";
 
 const app = new Elysia()
+  .use(
+    openapi({
+      documentation: {
+        info: {
+          title: "TaskMaster API",
+          version: "1.0.0",
+          description:
+            "API documentation for TaskMaster Kanban board application",
+        },
+        tags: [
+          { name: "auth", description: "Authentication endpoints" },
+          { name: "invitation", description: "Project invitation endpoints" },
+          { name: "projects", description: "Project management endpoints" },
+          { name: "tags", description: "Tag management endpoints" },
+        ],
+      },
+    })
+  )
   .onRequest(({ request, set }) => {
     // Set CORS headers for all requests
     set.headers["Access-Control-Allow-Origin"] = "*";

@@ -3,10 +3,11 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkProjectAccess } from "./helpers";
+import { ColumnsListResponse, ErrorResponse } from "../schemas";
 
-export const getColumns = new Elysia()
-  .use(jwtPlugin)
-  .get("/:id/columns", async ({ params, jwt, headers, set }) => {
+export const getColumns = new Elysia().use(jwtPlugin).get(
+  "/:id/columns",
+  async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
       return authResult;
@@ -57,4 +58,17 @@ export const getColumns = new Elysia()
         message: "Failed to fetch project columns",
       };
     }
-  });
+  },
+  {
+    response: {
+      200: ColumnsListResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
+  }
+);
