@@ -22,6 +22,7 @@ import {
   Home,
   Info,
   LayoutDashboard,
+  Cog,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/app/components/ui/avatar";
 import {
@@ -242,6 +243,35 @@ function AppSidebarProjectOptions() {
   );
 }
 
+// Config button component
+function AppSidebarConfigButton({
+  ...props
+}: React.ComponentProps<typeof SidebarMenuButton>) {
+  const { fullUser } = useAuth();
+  const { selectedProject, getProjectUrl } = useAppSidebar();
+  const router = useRouter();
+
+  if (!fullUser?.isAdmin || !selectedProject) return null;
+
+  const handleClick = () => {
+    const url = getProjectUrl(selectedProject);
+    router.push(`${url}/config`);
+  };
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        onClick={handleClick}
+        className="w-full justify-start"
+        {...props}
+      >
+        <Cog className="mr-2 h-4 w-4" />
+        Konfiguracja
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
 // Manage users button component
 function AppSidebarManageUsersButton({
   ...props
@@ -258,20 +288,33 @@ function AppSidebarManageUsersButton({
   };
 
   return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        onClick={handleClick}
+        className="w-full justify-start"
+        {...props}
+      >
+        <UserCog className="mr-2 h-4 w-4" />
+        Zarządzaj użytkownikami
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+// Management group wrapper
+function AppSidebarManagementGroup() {
+  const { fullUser } = useAuth();
+  const { selectedProject } = useAppSidebar();
+
+  if (!fullUser?.isAdmin || !selectedProject) return null;
+
+  return (
     <SidebarGroup>
       <SidebarGroupLabel>Zarządzanie</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={handleClick}
-              className="w-full justify-start"
-              {...props}
-            >
-              <UserCog className="mr-2 h-4 w-4" />
-              Zarządzaj użytkownikami
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          <AppSidebarConfigButton />
+          <AppSidebarManageUsersButton />
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
@@ -382,7 +425,7 @@ function AppSidebarDefault() {
         <AppSidebarHomeButton />
         <AppSidebarProjectGroup />
         <AppSidebarProjectOptions />
-        <AppSidebarManageUsersButton />
+        <AppSidebarManagementGroup />
         <AppSidebarAccountSection>
           <AppSidebarSettingsButton />
           <AppSidebarLogoutButton />
@@ -405,7 +448,9 @@ export const AppSidebar = Object.assign(AppSidebarDefault, {
   ProjectSelect: AppSidebarProjectSelect,
   CreateProjectButton: AppSidebarCreateProjectButton,
   ProjectDetailsButton: AppSidebarProjectDetailsButton,
+  ConfigButton: AppSidebarConfigButton,
   ManageUsersButton: AppSidebarManageUsersButton,
+  ManagementGroup: AppSidebarManagementGroup,
   AccountSection: AppSidebarAccountSection,
   SettingsButton: AppSidebarSettingsButton,
   LogoutButton: AppSidebarLogoutButton,

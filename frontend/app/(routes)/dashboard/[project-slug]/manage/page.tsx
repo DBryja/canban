@@ -29,14 +29,7 @@ import {
   SheetTrigger,
 } from "@/app/components/ui/sheet";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
-import {
-  UserPlus,
-  Trash2,
-  RefreshCw,
-  Copy,
-  Plus,
-  GripVertical,
-} from "lucide-react";
+import { UserPlus, Trash2, RefreshCw, Copy } from "lucide-react";
 import { useAppSidebar } from "@/app/components/AppSidebar/context";
 import type { Project } from "@/app/components/AppSidebar/utils";
 
@@ -61,20 +54,6 @@ interface Invitation {
   isValid: boolean;
 }
 
-interface TaskTag {
-  id: string;
-  name: string;
-  color: string | null;
-}
-
-interface ProjectColumn {
-  id: string;
-  projectId: string;
-  tagId: string;
-  order: number;
-  tag: TaskTag;
-}
-
 export default function ProjectManagePage() {
   const params = useParams();
   const router = useRouter();
@@ -94,14 +73,6 @@ export default function ProjectManagePage() {
   const [inviteExpiresInHours, setInviteExpiresInHours] = useState(24);
   const [creatingInvitation, setCreatingInvitation] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [columns, setColumns] = useState<ProjectColumn[]>([]);
-  const [tags, setTags] = useState<TaskTag[]>([]);
-  const [loadingColumns, setLoadingColumns] = useState(false);
-  const [isAddColumnModalOpen, setIsAddColumnModalOpen] = useState(false);
-  const [selectedTagId, setSelectedTagId] = useState<string>("");
-  const [addingColumn, setAddingColumn] = useState(false);
-  const [columnError, setColumnError] = useState<string | null>(null);
-  const [deletingColumn, setDeletingColumn] = useState<string | null>(null);
 
   useEffect(() => {
     if (!projectSlug || !user || !fullUser?.isAdmin) {
@@ -142,24 +113,6 @@ export default function ProjectManagePage() {
           setInvitations(invitationsResponse.data.invitations);
         } catch (err) {
           console.error("Failed to fetch invitations:", err);
-        }
-
-        // Fetch project columns
-        try {
-          const columnsResponse = await api.get<{ columns: ProjectColumn[] }>(
-            `/projects/${foundProject.id}/columns`
-          );
-          setColumns(columnsResponse.data.columns);
-        } catch (err) {
-          console.error("Failed to fetch columns:", err);
-        }
-
-        // Fetch all tags
-        try {
-          const tagsResponse = await api.get<{ tags: TaskTag[] }>("/tags");
-          setTags(tagsResponse.data.tags);
-        } catch (err) {
-          console.error("Failed to fetch tags:", err);
         }
       } catch (err: unknown) {
         const errorData = (
@@ -284,71 +237,12 @@ export default function ProjectManagePage() {
         `/invitations/project/${project.id}`
       );
       setInvitations(invitationsResponse.data.invitations);
-
-      const columnsResponse = await api.get<{ columns: ProjectColumn[] }>(
-        `/projects/${project.id}/columns`
-      );
-      setColumns(columnsResponse.data.columns);
     } catch (err) {
       console.error("Failed to refresh:", err);
     } finally {
       setLoading(false);
     }
   };
-
-  const handleAddColumn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!project || !selectedTagId) return;
-
-    try {
-      setAddingColumn(true);
-      setColumnError(null);
-
-      await api.post<{ column: ProjectColumn }>(
-        `/projects/${project.id}/columns`,
-        {
-          tagId: selectedTagId,
-        }
-      );
-
-      const columnsResponse = await api.get<{ columns: ProjectColumn[] }>(
-        `/projects/${project.id}/columns`
-      );
-      setColumns(columnsResponse.data.columns);
-
-      setSelectedTagId("");
-      setIsAddColumnModalOpen(false);
-    } catch (err: unknown) {
-      const errorMessage =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Nie udało się dodać kolumny";
-      setColumnError(errorMessage);
-    } finally {
-      setAddingColumn(false);
-    }
-  };
-
-  const handleDeleteColumn = async (columnId: string) => {
-    if (!project) return;
-
-    try {
-      setDeletingColumn(columnId);
-      await api.delete(`/projects/${project.id}/columns/${columnId}`);
-
-      const columnsResponse = await api.get<{ columns: ProjectColumn[] }>(
-        `/projects/${project.id}/columns`
-      );
-      setColumns(columnsResponse.data.columns);
-    } catch (err) {
-      console.error("Failed to delete column:", err);
-    } finally {
-      setDeletingColumn(null);
-    }
-  };
-
-  const availableTags = tags.filter(
-    (tag) => !columns.some((col) => col.tagId === tag.id)
-  );
 
   const copyInvitationLink = (token: string) => {
     const link = `${window.location.origin}/invitations/${token}`;
@@ -647,127 +541,6 @@ export default function ProjectManagePage() {
                     >
                       <Copy className="h-4 w-4 mr-2" />
                       Kopiuj link
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Kolumny kanban</CardTitle>
-                <CardDescription>
-                  Zarządzaj kolumnami wyświetlanymi na tablicy kanban projektu
-                </CardDescription>
-              </div>
-              <Sheet
-                open={isAddColumnModalOpen}
-                onOpenChange={setIsAddColumnModalOpen}
-              >
-                <SheetTrigger asChild>
-                  <Button disabled={availableTags.length === 0}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Dodaj kolumnę
-                  </Button>
-                </SheetTrigger>
-                <SheetContent>
-                  <SheetHeader>
-                    <SheetTitle>Dodaj kolumnę</SheetTitle>
-                    <SheetDescription>
-                      Wybierz tag, który będzie reprezentował tę kolumnę
-                    </SheetDescription>
-                  </SheetHeader>
-                  <form onSubmit={handleAddColumn} className="space-y-4 mt-4">
-                    {columnError && (
-                      <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-                        {columnError}
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <label htmlFor="tag" className="text-sm font-medium">
-                        Tag *
-                      </label>
-                      <Select
-                        value={selectedTagId}
-                        onValueChange={setSelectedTagId}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Wybierz tag" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableTags.map((tag) => (
-                            <SelectItem key={tag.id} value={tag.id}>
-                              <div className="flex items-center gap-2">
-                                {tag.color && (
-                                  <span
-                                    className="w-3 h-3 rounded-full"
-                                    style={{ backgroundColor: tag.color }}
-                                  />
-                                )}
-                                {tag.name}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        type="submit"
-                        disabled={addingColumn || !selectedTagId}
-                        className="flex-1"
-                      >
-                        {addingColumn ? "Dodawanie..." : "Dodaj kolumnę"}
-                      </Button>
-                    </div>
-                  </form>
-                </SheetContent>
-              </Sheet>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {columns.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Brak kolumn. Dodaj kolumny, aby wyświetlić zadania w formie
-                kanban.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {columns.map((column) => (
-                  <div
-                    key={column.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex items-center gap-2">
-                        {column.tag.color && (
-                          <span
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: column.tag.color }}
-                          />
-                        )}
-                        <span className="text-sm font-medium">
-                          {column.tag.name}
-                        </span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        (Kolejność: {column.order})
-                      </span>
-                    </div>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDeleteColumn(column.id)}
-                      disabled={deletingColumn === column.id}
-                    >
-                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
