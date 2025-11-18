@@ -20,6 +20,11 @@ export interface Project {
       name: string;
       color: string | null;
     }>;
+    columnOrders?: Array<{
+      id: string;
+      columnId: string;
+      order: number;
+    }>;
   }>;
   columns?: Array<{
     id: string;

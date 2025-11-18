@@ -101,6 +101,7 @@ model Task {
   creator     User      @relation("TaskCreator", fields: [creatorId], references: [id])
   mainTag     TaskTag?  @relation("TaskMainTag", fields: [mainTagId], references: [id])
   tags        TaskTag[] @relation("TaskTags")
+  columnOrders TaskColumnOrder[] // Task orders in columns
 
   @@unique([projectId, number]) // Task number must be unique within project
   @@index([projectId])
@@ -140,10 +141,30 @@ model ProjectColumn {
   // Relations
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tag       TaskTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  taskOrders TaskColumnOrder[] // Task orders within this column
 
   @@unique([projectId, tagId]) // One tag can only be used once per project
   @@index([projectId])
   @@index([tagId])
   @@index([projectId, order]) // For ordering columns within a project
+}
+
+// TaskColumnOrder model - stores task order within columns
+model TaskColumnOrder {
+  id        String   @id @default(cuid())
+  taskId    String
+  columnId  String   // ProjectColumn id
+  order     Int      // Order of task within the column
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  column    ProjectColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, columnId]) // One task can only have one order per column
+  @@index([taskId])
+  @@index([columnId])
+  @@index([columnId, order]) // For ordering tasks within a column
 }
 

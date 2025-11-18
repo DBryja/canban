@@ -2,6 +2,25 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import {
@@ -47,6 +66,105 @@ interface ProjectColumn {
   tag: TaskTag;
 }
 
+interface Task {
+  id: string;
+  number: number | null;
+  title: string;
+  description: string | null;
+  tags?: Array<{
+    id: string;
+    name: string;
+    color: string | null;
+  }>;
+  columnOrders?: Array<{
+    id: string;
+    columnId: string;
+    order: number;
+  }>;
+}
+
+interface SortableTaskProps {
+  task: Task;
+  columnId: string;
+}
+
+function TaskCard({
+  task,
+  isDragging = false,
+}: {
+  task: Task;
+  isDragging?: boolean;
+}) {
+  return (
+    <Card
+      className={`p-3 ${isDragging ? "shadow-2xl rotate-2" : ""}`}
+      style={isDragging ? { opacity: 1 } : undefined}
+    >
+      <CardHeader className="p-0 pb-2">
+        <CardTitle className="text-base">
+          #{task.number ?? "?"} - {task.title}
+        </CardTitle>
+        {task.description && (
+          <CardDescription className="text-sm text-wrap">
+            {task.description}
+          </CardDescription>
+        )}
+      </CardHeader>
+      {task.tags && task.tags.length > 0 && (
+        <CardContent className="p-0 pt-2">
+          <div className="flex flex-wrap gap-1">
+            {task.tags.map((tag) => (
+              <span
+                key={tag.id}
+                className="text-xs px-2 py-1 rounded bg-muted"
+                style={
+                  tag.color
+                    ? {
+                        backgroundColor: `${tag.color}20`,
+                        color: tag.color,
+                      }
+                    : undefined
+                }
+              >
+                {tag.name}
+              </span>
+            ))}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+function SortableTask({ task, columnId }: SortableTaskProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <div
+        className="cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      >
+        <TaskCard task={task} />
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -68,6 +186,20 @@ export default function ProjectPage() {
     "admin" | "maintainer" | "guest" | null
   >(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [updatingTask, setUpdatingTask] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   useEffect(() => {
     if (!projectSlug || !user) return;
 
@@ -166,12 +298,22 @@ export default function ProjectPage() {
     );
   }
 
-  // Get tasks for each column based on tag
-  const getTasksForColumn = (columnTagId: string) => {
+  // Get tasks for each column based on tag and sort by order
+  const getTasksForColumn = (columnTagId: string, columnId: string) => {
     if (!project.tasks) return [];
-    return project.tasks.filter((task) =>
+    const tasks = project.tasks.filter((task) =>
       task.tags?.some((tag) => tag.id === columnTagId)
     );
+
+    return tasks.sort((a, b) => {
+      const aOrder =
+        a.columnOrders?.find((co) => co.columnId === columnId)?.order ??
+        Infinity;
+      const bOrder =
+        b.columnOrders?.find((co) => co.columnId === columnId)?.order ??
+        Infinity;
+      return aOrder - bOrder;
+    });
   };
 
   const handleAddColumn = async (e: React.FormEvent) => {
@@ -202,6 +344,121 @@ export default function ProjectPage() {
       setColumnError(errorMessage);
     } finally {
       setAddingColumn(false);
+    }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const taskId = event.active.id as string;
+    const task = project?.tasks?.find((t) => t.id === taskId);
+    if (task) {
+      setActiveTask(task);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveTask(null);
+
+    if (!project || !over || active.id === over.id) return;
+
+    const taskId = active.id as string;
+    const overId = over.id as string;
+
+    const task = project.tasks?.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const sourceColumn = project.columns?.find((col) => {
+      const columnTasks = getTasksForColumn(col.tag.id, col.id);
+      return columnTasks.some((t) => t.id === taskId);
+    });
+
+    if (!sourceColumn) return;
+
+    const isOverColumn = project.columns?.some((col) => col.id === overId);
+    const isOverTask = project.tasks?.some((t) => t.id === overId);
+
+    if (isOverColumn) {
+      const targetColumn = project.columns?.find((col) => col.id === overId);
+      if (!targetColumn || sourceColumn.id === targetColumn.id) return;
+
+      try {
+        setUpdatingTask(taskId);
+        const targetTasks = getTasksForColumn(
+          targetColumn.tag.id,
+          targetColumn.id
+        );
+        const newOrder = targetTasks.length;
+
+        await api.patch(`/projects/${project.id}/tasks/${taskId}/move`, {
+          fromColumnId: sourceColumn.id,
+          toColumnId: targetColumn.id,
+          newOrder,
+        });
+
+        const projectResponse = await api.get<Project>(
+          `/projects/${project.id}`
+        );
+        setProject(projectResponse.data);
+      } catch (err) {
+        console.error("Failed to move task:", err);
+      } finally {
+        setUpdatingTask(null);
+      }
+    } else if (isOverTask) {
+      const targetTask = project.tasks?.find((t) => t.id === overId);
+      if (!targetTask) return;
+
+      const targetColumn = project.columns?.find((col) => {
+        const columnTasks = getTasksForColumn(col.tag.id, col.id);
+        return columnTasks.some((t) => t.id === overId);
+      });
+
+      if (!targetColumn) return;
+
+      const isSameColumn = sourceColumn.id === targetColumn.id;
+      const columnTasks = getTasksForColumn(
+        targetColumn.tag.id,
+        targetColumn.id
+      );
+      const targetIndex = columnTasks.findIndex((t) => t.id === overId);
+
+      if (targetIndex === -1) return;
+
+      try {
+        setUpdatingTask(taskId);
+
+        if (isSameColumn) {
+          const newTasks = arrayMove(
+            columnTasks,
+            columnTasks.findIndex((t) => t.id === taskId),
+            targetIndex
+          );
+          const taskOrders = newTasks.map((t, index) => ({
+            taskId: t.id,
+            order: index,
+          }));
+
+          await api.patch(`/projects/${project.id}/tasks/reorder`, {
+            columnId: targetColumn.id,
+            taskOrders,
+          });
+        } else {
+          await api.patch(`/projects/${project.id}/tasks/${taskId}/move`, {
+            fromColumnId: sourceColumn.id,
+            toColumnId: targetColumn.id,
+            newOrder: targetIndex,
+          });
+        }
+
+        const projectResponse = await api.get<Project>(
+          `/projects/${project.id}`
+        );
+        setProject(projectResponse.data);
+      } catch (err) {
+        console.error("Failed to move task:", err);
+      } finally {
+        setUpdatingTask(null);
+      }
     }
   };
 
@@ -301,100 +558,102 @@ export default function ProjectPage() {
         </div>
 
         {project.columns && project.columns.length > 0 ? (
-          <ScrollArea
-            className="h-full overflow-y-hidden overflow-x-auto"
-            ref={scrollAreaRef}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
           >
-            <div
-              className="grid gap-4 h-full max-h-full overflow-visible whitespace-nowrap"
+            <ScrollArea
+              className="h-full overflow-y-hidden overflow-x-auto"
+              ref={scrollAreaRef}
+            >
+              <div
+                className="grid gap-4 h-full max-h-full overflow-visible whitespace-nowrap"
+                style={{
+                  gridTemplateRows: `100%`,
+                  gridTemplateColumns: `repeat(${project.columns.length}, 320px)`,
+                }}
+              >
+                {project.columns.map((column) => {
+                  const columnTasks = getTasksForColumn(
+                    column.tag.id,
+                    column.id
+                  );
+                  const taskIds = columnTasks.map((t) => t.id);
+                  return (
+                    <div
+                      key={column.id}
+                      id={column.id}
+                      className="bg-card border rounded-lg py-4 px-1 h-full overflow-y-hidden"
+                      style={{ height: columnHeight }}
+                    >
+                      <div className="flex justify-between items-center px-3 relative z-40">
+                        <h3 className="font-semibold text-lg flex items-center gap-2">
+                          {column.tag.color && (
+                            <span
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: column.tag.color }}
+                            />
+                          )}
+                          {column.tag.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {columnTasks.length} zadań
+                        </p>
+                        <span
+                          className="absolute top-[90%] left-0 right-0 h-4 opacity-100"
+                          style={{
+                            backgroundImage: `linear-gradient(to bottom, rgb(52, 52, 52), transparent)`,
+                          }}
+                        />
+                      </div>
+                      <ScrollArea className="space-y-2 h-full pl-1 pr-3">
+                        <SortableContext
+                          items={taskIds}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="space-y-2">
+                            {columnTasks.length > 0 ? (
+                              columnTasks.map((task, i) => (
+                                <div
+                                  key={task.id}
+                                  className={
+                                    i === columnTasks.length - 1 ? "mb-6" : ""
+                                  }
+                                  style={
+                                    i === 0 ? { marginTop: "1rem" } : undefined
+                                  }
+                                >
+                                  <SortableTask
+                                    task={task}
+                                    columnId={column.id}
+                                  />
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-sm text-muted-foreground text-center py-4">
+                                Brak zadań
+                              </p>
+                            )}
+                          </div>
+                        </SortableContext>
+                      </ScrollArea>
+                    </div>
+                  );
+                })}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+            <DragOverlay
               style={{
-                gridTemplateRows: `100%`,
-                gridTemplateColumns: `repeat(${project.columns.length}, 320px)`,
+                zIndex: 9999,
+                cursor: "grabbing",
               }}
             >
-              {project.columns.map((column) => {
-                const columnTasks = getTasksForColumn(column.tag.id);
-                return (
-                  <div
-                    key={column.id}
-                    className="bg-card border rounded-lg py-4 px-1 h-full overflow-y-hidden"
-                    style={{ height: columnHeight }}
-                  >
-                    <div className="flex justify-between items-center px-3 relative z-40">
-                      <h3 className="font-semibold text-lg flex items-center gap-2">
-                        {column.tag.color && (
-                          <span
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: column.tag.color }}
-                          />
-                        )}
-                        {column.tag.name}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {columnTasks.length} zadań
-                      </p>
-                      <span
-                        className="absolute top-[90%] left-0 right-0 h-4 opacity-100"
-                        style={{
-                          backgroundImage: `linear-gradient(to bottom, rgb(52, 52, 52), transparent)`,
-                        }}
-                      />
-                    </div>
-                    <ScrollArea className="space-y-2 h-full pl-1 pr-3">
-                      <div className="space-y-2">
-                        {columnTasks.length > 0 ? (
-                          columnTasks.map((task, i) => (
-                            <Card
-                              key={task.id}
-                              className={`p-3 ${i === columnTasks.length - 1 ? "mb-6" : ""} ${i === 0 ? "mt-4" : ""}`}
-                            >
-                              <CardHeader className="p-0 pb-2">
-                                <CardTitle className="text-base">
-                                  #{task.number ?? "?"} - {task.title}
-                                </CardTitle>
-                                {task.description && (
-                                  <CardDescription className="text-sm text-wrap">
-                                    {task.description}
-                                  </CardDescription>
-                                )}
-                              </CardHeader>
-                              {task.tags && task.tags.length > 0 && (
-                                <CardContent className="p-0 pt-2">
-                                  <div className="flex flex-wrap gap-1">
-                                    {task.tags.map((tag) => (
-                                      <span
-                                        key={tag.id}
-                                        className="text-xs px-2 py-1 rounded bg-muted"
-                                        style={
-                                          tag.color
-                                            ? {
-                                                backgroundColor: `${tag.color}20`,
-                                                color: tag.color,
-                                              }
-                                            : undefined
-                                        }
-                                      >
-                                        {tag.name}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </CardContent>
-                              )}
-                            </Card>
-                          ))
-                        ) : (
-                          <p className="text-sm text-muted-foreground text-center py-4">
-                            Brak zadań
-                          </p>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </div>
-                );
-              })}
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+              {activeTask ? <TaskCard task={activeTask} isDragging /> : null}
+            </DragOverlay>
+          </DndContext>
         ) : (
           <Card>
             <CardHeader>
