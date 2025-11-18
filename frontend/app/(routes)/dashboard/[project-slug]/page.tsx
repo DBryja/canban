@@ -31,6 +31,7 @@ import {
   CardTitle,
 } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -243,6 +244,15 @@ export default function ProjectPage() {
   const [savingDescription, setSavingDescription] = useState(false);
   const [savingAssignee, setSavingAssignee] = useState(false);
   const [addingComment, setAddingComment] = useState(false);
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [selectedColumnId, setSelectedColumnId] = useState<string>("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [addingTask, setAddingTask] = useState(false);
+  const [taskError, setTaskError] = useState<string | null>(null);
+  const [taskTagIds, setTaskTagIds] = useState<string[]>([]);
+  const [savingTags, setSavingTags] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -329,6 +339,9 @@ export default function ProjectPage() {
         );
         setTaskDetails(response.data.task);
         setDescription(response.data.task.description || "");
+        // Get task tags from project tasks
+        const task = project.tasks?.find((t) => t.id === selectedTaskId);
+        setTaskTagIds(task?.tags?.map((tag) => tag.id) || []);
       } catch (err) {
         console.error("Failed to fetch task details:", err);
       } finally {
@@ -409,6 +422,35 @@ export default function ProjectPage() {
       console.error("Failed to save assignee:", err);
     } finally {
       setSavingAssignee(false);
+    }
+  };
+
+  const handleSaveTags = async () => {
+    if (!project || !selectedTaskId) return;
+
+    try {
+      setSavingTags(true);
+      await api.patch<{
+        task: {
+          id: string;
+          tags: Array<{ id: string; name: string; color: string | null }>;
+        };
+      }>(`/projects/${project.id}/tasks/${selectedTaskId}/tags`, {
+        tagIds: taskTagIds,
+      });
+      const projectResponse = await api.get<Project>(`/projects/${project.id}`);
+      setProject(projectResponse.data);
+      // Update taskTagIds from the response
+      const task = projectResponse.data.tasks?.find(
+        (t) => t.id === selectedTaskId
+      );
+      if (task) {
+        setTaskTagIds(task.tags?.map((tag) => tag.id) || []);
+      }
+    } catch (err) {
+      console.error("Failed to save tags:", err);
+    } finally {
+      setSavingTags(false);
     }
   };
 
@@ -523,6 +565,43 @@ export default function ProjectPage() {
       setColumnError(errorMessage);
     } finally {
       setAddingColumn(false);
+    }
+  };
+
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!project || !taskTitle.trim()) return;
+
+    try {
+      setAddingTask(true);
+      setTaskError(null);
+
+      await api.post(`/projects/${project.id}/tasks`, {
+        title: taskTitle.trim(),
+        description: taskDescription.trim() || undefined,
+        columnId:
+          selectedColumnId && selectedColumnId !== "none"
+            ? selectedColumnId
+            : undefined,
+        tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+      });
+
+      // Refresh project to get updated tasks
+      const projectResponse = await api.get<Project>(`/projects/${project.id}`);
+      setProject(projectResponse.data);
+
+      setTaskTitle("");
+      setTaskDescription("");
+      setSelectedColumnId("");
+      setSelectedTagIds([]);
+      setIsAddTaskModalOpen(false);
+    } catch (err: unknown) {
+      const errorMessage =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Nie udało się dodać zadania";
+      setTaskError(errorMessage);
+    } finally {
+      setAddingTask(false);
     }
   };
 
@@ -657,76 +736,219 @@ export default function ProjectPage() {
         </div>
 
         <div className="flex items-center justify-between mb-4">
-          {canManageColumns && (
+          <div className="flex gap-2">
+            {canManageColumns && (
+              <Sheet
+                open={isAddColumnModalOpen}
+                onOpenChange={setIsAddColumnModalOpen}
+              >
+                <SheetTrigger asChild>
+                  <Button disabled={availableTags.length === 0}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Dodaj kolumnę
+                  </Button>
+                </SheetTrigger>
+                <SheetContent>
+                  <SheetHeader>
+                    <SheetTitle>Dodaj kolumnę</SheetTitle>
+                    <SheetDescription>
+                      Wybierz tag, który będzie reprezentował tę kolumnę
+                    </SheetDescription>
+                  </SheetHeader>
+                  <form
+                    onSubmit={handleAddColumn}
+                    className="space-y-4 mt-4 px-4"
+                  >
+                    {columnError && (
+                      <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+                        {columnError}
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <label htmlFor="tag" className="text-sm font-medium">
+                        Tag *
+                      </label>
+                      <Select
+                        value={selectedTagId}
+                        onValueChange={setSelectedTagId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Wybierz tag" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableTags.map((tag) => (
+                            <SelectItem key={tag.id} value={tag.id}>
+                              <div className="flex items-center gap-2">
+                                {tag.color && (
+                                  <span
+                                    className="w-3 h-3 rounded-full"
+                                    style={{ backgroundColor: tag.color }}
+                                  />
+                                )}
+                                {tag.name}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        type="submit"
+                        disabled={addingColumn || !selectedTagId}
+                        className="flex-1"
+                      >
+                        {addingColumn ? "Dodawanie..." : "Dodaj kolumnę"}
+                      </Button>
+                    </div>
+                  </form>
+                </SheetContent>
+              </Sheet>
+            )}
             <Sheet
-              open={isAddColumnModalOpen}
-              onOpenChange={setIsAddColumnModalOpen}
+              open={isAddTaskModalOpen}
+              onOpenChange={setIsAddTaskModalOpen}
             >
               <SheetTrigger asChild>
-                <Button disabled={availableTags.length === 0}>
+                <Button>
                   <Plus className="mr-2 h-4 w-4" />
-                  Dodaj kolumnę
+                  Dodaj ticket
                 </Button>
               </SheetTrigger>
               <SheetContent>
                 <SheetHeader>
-                  <SheetTitle>Dodaj kolumnę</SheetTitle>
+                  <SheetTitle>Dodaj ticket</SheetTitle>
                   <SheetDescription>
-                    Wybierz tag, który będzie reprezentował tę kolumnę
+                    Utwórz nowe zadanie w projekcie
                   </SheetDescription>
                 </SheetHeader>
-                <form
-                  onSubmit={handleAddColumn}
-                  className="space-y-4 mt-4 px-4"
-                >
-                  {columnError && (
+                <form onSubmit={handleAddTask} className="space-y-4 mt-4 px-4">
+                  {taskError && (
                     <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-                      {columnError}
+                      {taskError}
                     </div>
                   )}
 
                   <div className="space-y-2">
-                    <label htmlFor="tag" className="text-sm font-medium">
-                      Tag *
+                    <label htmlFor="taskTitle" className="text-sm font-medium">
+                      Tytuł *
                     </label>
-                    <Select
-                      value={selectedTagId}
-                      onValueChange={setSelectedTagId}
+                    <Input
+                      id="taskTitle"
+                      type="text"
+                      value={taskTitle}
+                      onChange={(e) => setTaskTitle(e.target.value)}
+                      placeholder="Wprowadź tytuł zadania"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="taskDescription"
+                      className="text-sm font-medium"
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Wybierz tag" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableTags.map((tag) => (
-                          <SelectItem key={tag.id} value={tag.id}>
-                            <div className="flex items-center gap-2">
+                      Opis
+                    </label>
+                    <textarea
+                      id="taskDescription"
+                      className="w-full min-h-[100px] px-3 py-2 text-sm border rounded-md bg-transparent resize-y"
+                      value={taskDescription}
+                      onChange={(e) => setTaskDescription(e.target.value)}
+                      placeholder="Dodaj opis zadania (opcjonalnie)"
+                    />
+                  </div>
+
+                  {project.columns && project.columns.length > 0 && (
+                    <div className="space-y-2">
+                      <label htmlFor="column" className="text-sm font-medium">
+                        Kolumna
+                      </label>
+                      <Select
+                        value={selectedColumnId}
+                        onValueChange={setSelectedColumnId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Wybierz kolumnę (opcjonalnie)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Brak</SelectItem>
+                          {project.columns.map((column) => (
+                            <SelectItem key={column.id} value={column.id}>
+                              <div className="flex items-center gap-2">
+                                {column.tag.color && (
+                                  <span
+                                    className="w-3 h-3 rounded-full"
+                                    style={{
+                                      backgroundColor: column.tag.color,
+                                    }}
+                                  />
+                                )}
+                                {column.tag.name}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {tags.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Tagi</label>
+                      <div className="max-h-[200px] overflow-y-auto border rounded-md p-3 space-y-2">
+                        {tags.map((tag) => (
+                          <label
+                            key={tag.id}
+                            className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedTagIds.includes(tag.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedTagIds([
+                                    ...selectedTagIds,
+                                    tag.id,
+                                  ]);
+                                } else {
+                                  setSelectedTagIds(
+                                    selectedTagIds.filter((id) => id !== tag.id)
+                                  );
+                                }
+                              }}
+                              className="rounded"
+                            />
+                            <div className="flex items-center gap-2 flex-1">
                               {tag.color && (
                                 <span
                                   className="w-3 h-3 rounded-full"
                                   style={{ backgroundColor: tag.color }}
                                 />
                               )}
-                              {tag.name}
+                              <span className="text-sm">{tag.name}</span>
                             </div>
-                          </SelectItem>
+                          </label>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex gap-2">
                     <Button
                       type="submit"
-                      disabled={addingColumn || !selectedTagId}
+                      disabled={addingTask || !taskTitle.trim()}
                       className="flex-1"
                     >
-                      {addingColumn ? "Dodawanie..." : "Dodaj kolumnę"}
+                      {addingTask ? "Dodawanie..." : "Dodaj ticket"}
                     </Button>
                   </div>
                 </form>
               </SheetContent>
             </Sheet>
-          )}
+          </div>
         </div>
 
         {project.columns && project.columns.length > 0 ? (
@@ -902,6 +1124,60 @@ export default function ProjectPage() {
                     >
                       {savingDescription ? "Zapisywanie..." : "Zapisz opis"}
                     </Button>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex flex-col space-y-4">
+                    <label className="text-sm font-medium">Tagi</label>
+                    {tags.length > 0 ? (
+                      <>
+                        <div className="max-h-[200px] overflow-y-auto border rounded-md p-3 space-y-2">
+                          {tags.map((tag) => (
+                            <label
+                              key={tag.id}
+                              className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={taskTagIds.includes(tag.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setTaskTagIds([...taskTagIds, tag.id]);
+                                  } else {
+                                    setTaskTagIds(
+                                      taskTagIds.filter((id) => id !== tag.id)
+                                    );
+                                  }
+                                }}
+                                className="rounded"
+                              />
+                              <div className="flex items-center gap-2 flex-1">
+                                {tag.color && (
+                                  <span
+                                    className="w-3 h-3 rounded-full"
+                                    style={{ backgroundColor: tag.color }}
+                                  />
+                                )}
+                                <span className="text-sm">{tag.name}</span>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                        <Button
+                          onClick={handleSaveTags}
+                          disabled={savingTags}
+                          size="sm"
+                          className="w-fit"
+                        >
+                          {savingTags ? "Zapisywanie..." : "Zapisz tagi"}
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Brak dostępnych tagów
+                      </p>
+                    )}
                   </div>
 
                   <Separator />

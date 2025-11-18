@@ -1179,6 +1179,180 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       }),
     }
   )
+  // Create task
+  .post(
+    "/:id/tasks",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership) {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "You don't have access to this project",
+            };
+          }
+        }
+
+        // Get the next task number for this project
+        const maxTask = await prisma.task.findFirst({
+          where: { projectId },
+          orderBy: { number: "desc" },
+        });
+
+        const nextNumber = maxTask ? maxTask.number + 1 : 1;
+
+        // Get the first column's tag if columnId is provided, otherwise use mainTagId
+        let mainTagId = body.mainTagId || null;
+        let columnTagId = null;
+        if (body.columnId && !mainTagId) {
+          const column = await prisma.projectColumn.findUnique({
+            where: { id: body.columnId },
+          });
+          if (column && column.projectId === projectId) {
+            mainTagId = column.tagId;
+            columnTagId = column.tagId;
+          }
+        }
+
+        // Prepare tag IDs - include column tag if provided
+        const tagIdsToConnect = body.tagIds ? [...body.tagIds] : [];
+        if (columnTagId && !tagIdsToConnect.includes(columnTagId)) {
+          tagIdsToConnect.push(columnTagId);
+        }
+
+        const task = await prisma.task.create({
+          data: {
+            title: body.title,
+            description: body.description || null,
+            projectId,
+            creatorId: userId,
+            number: nextNumber,
+            mainTagId,
+            tags:
+              tagIdsToConnect.length > 0
+                ? {
+                    connect: tagIdsToConnect.map((tagId) => ({
+                      id: tagId,
+                    })),
+                  }
+                : undefined,
+          },
+          include: {
+            tags: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+            assignee: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+              },
+            },
+            columnOrders: {
+              select: {
+                id: true,
+                columnId: true,
+                order: true,
+              },
+            },
+          },
+        });
+
+        // If columnId is provided, add task to that column
+        if (body.columnId) {
+          const column = await prisma.projectColumn.findUnique({
+            where: { id: body.columnId },
+          });
+
+          if (column && column.projectId === projectId) {
+            // Get existing tasks in this column to determine order
+            const existingOrders = await prisma.taskColumnOrder.findMany({
+              where: { columnId: body.columnId },
+              orderBy: { order: "desc" },
+              take: 1,
+            });
+
+            const newOrder =
+              existingOrders.length > 0 ? existingOrders[0].order + 1 : 0;
+
+            await prisma.taskColumnOrder.create({
+              data: {
+                taskId: task.id,
+                columnId: body.columnId,
+                order: newOrder,
+              },
+            });
+          }
+        }
+
+        return {
+          task: {
+            id: task.id,
+            number: task.number,
+            title: task.title,
+            description: task.description,
+            assignee: task.assignee,
+            tags: task.tags,
+            columnOrders: task.columnOrders,
+          },
+          message: "Task created successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to create task",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        title: t.String({ minLength: 1 }),
+        description: t.Optional(t.String()),
+        mainTagId: t.Optional(t.String()),
+        tagIds: t.Optional(t.Array(t.String())),
+        columnId: t.Optional(t.String()),
+      }),
+    }
+  )
   // Get task details with comments and assignee
   .get("/:id/tasks/:taskId", async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
@@ -1497,6 +1671,128 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
     {
       body: t.Object({
         assigneeId: t.Optional(t.String()),
+      }),
+    }
+  )
+  // Update task tags
+  .patch(
+    "/:id/tasks/:taskId/tags",
+    async ({ params, body, jwt, headers, set }) => {
+      const authResult = await requireAuth(jwt, headers, set);
+      if ("error" in authResult) {
+        return authResult;
+      }
+      const { userId } = authResult;
+      const { id: projectId, taskId } = params;
+
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { isAdmin: true },
+        });
+
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+        });
+
+        if (!project) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Project not found",
+          };
+        }
+
+        if (!user?.isAdmin) {
+          const membership = await prisma.projectMember.findUnique({
+            where: {
+              userId_projectId: {
+                userId,
+                projectId,
+              },
+            },
+          });
+
+          if (!membership) {
+            set.status = 403;
+            return {
+              error: "Forbidden",
+              message: "You don't have access to this project",
+            };
+          }
+        }
+
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+        });
+
+        if (!task || task.projectId !== projectId) {
+          set.status = 404;
+          return {
+            error: "Not Found",
+            message: "Task not found",
+          };
+        }
+
+        // Verify all tag IDs exist
+        if (body.tagIds && body.tagIds.length > 0) {
+          const existingTags = await prisma.taskTag.findMany({
+            where: {
+              id: {
+                in: body.tagIds,
+              },
+            },
+          });
+
+          if (existingTags.length !== body.tagIds.length) {
+            set.status = 400;
+            return {
+              error: "Bad Request",
+              message: "One or more tags not found",
+            };
+          }
+        }
+
+        const tagIdsToSet = [];
+        for (const tagId of body.tagIds) {
+          tagIdsToSet.push({ id: tagId });
+        }
+        const updatedTask = await prisma.task.update({
+          where: { id: taskId },
+          data: {
+            tags: {
+              set: tagIdsToSet,
+            },
+          },
+          include: {
+            tags: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        });
+
+        return {
+          task: {
+            id: updatedTask.id,
+            tags: updatedTask.tags,
+          },
+          message: "Task tags updated successfully",
+        };
+      } catch (err) {
+        set.status = 500;
+        return {
+          error: "Internal Server Error",
+          message: "Failed to update task tags",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        tagIds: t.Array(t.String()),
       }),
     }
   )
