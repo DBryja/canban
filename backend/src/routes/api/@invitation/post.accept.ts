@@ -2,10 +2,11 @@ import { Elysia } from "elysia";
 import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
+import { InvitationAcceptResponse, ErrorResponse } from "../schemas";
 
-export const postAccept = new Elysia()
-  .use(jwtPlugin)
-  .post("/:token/accept", async ({ params, jwt, headers, set }) => {
+export const postAccept = new Elysia().use(jwtPlugin).post(
+  "/:token/accept",
+  async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
       return authResult;
@@ -122,4 +123,19 @@ export const postAccept = new Elysia()
         message: "Failed to accept invitation",
       };
     }
-  });
+  },
+  {
+    response: {
+      200: InvitationAcceptResponse,
+      400: ErrorResponse,
+      401: ErrorResponse,
+      404: ErrorResponse,
+      409: ErrorResponse,
+      410: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["invitation"],
+    },
+  }
+);

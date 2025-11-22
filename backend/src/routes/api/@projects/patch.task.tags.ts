@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkProjectAccess } from "./helpers";
+import { TaskTagsUpdateResponse, ErrorResponse } from "../schemas";
 
 export const patchTaskTags = new Elysia().use(jwtPlugin).patch(
   "/:id/tasks/:taskId/tags",
@@ -104,5 +105,16 @@ export const patchTaskTags = new Elysia().use(jwtPlugin).patch(
     body: t.Object({
       tagIds: t.Array(t.String()),
     }),
+    response: {
+      200: TaskTagsUpdateResponse,
+      400: ErrorResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
   }
 );

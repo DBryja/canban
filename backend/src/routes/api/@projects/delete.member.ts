@@ -3,10 +3,11 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkAdminAccess } from "./helpers";
+import { SuccessMessageResponse, ErrorResponse } from "../schemas";
 
-export const deleteMember = new Elysia()
-  .use(jwtPlugin)
-  .delete("/:id/members/:memberId", async ({ params, jwt, headers, set }) => {
+export const deleteMember = new Elysia().use(jwtPlugin).delete(
+  "/:id/members/:memberId",
+  async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
       return authResult;
@@ -59,4 +60,17 @@ export const deleteMember = new Elysia()
         message: "Failed to remove project member",
       };
     }
-  });
+  },
+  {
+    response: {
+      200: SuccessMessageResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
+  }
+);

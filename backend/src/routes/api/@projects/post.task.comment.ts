@@ -4,6 +4,7 @@ import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkProjectAccess } from "./helpers";
 import { connectQueue, publishNotification } from "../../../lib/queue";
+import { CommentCreateResponse, ErrorResponse } from "../schemas";
 
 export const postTaskComment = new Elysia().use(jwtPlugin).post(
   "/:id/tasks/:taskId/comments",
@@ -154,5 +155,15 @@ export const postTaskComment = new Elysia().use(jwtPlugin).post(
     body: t.Object({
       content: t.String({ minLength: 1 }),
     }),
+    response: {
+      200: CommentCreateResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
   }
 );

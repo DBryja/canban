@@ -3,10 +3,11 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkMaintainerAccess } from "./helpers";
+import { SuccessMessageResponse, ErrorResponse } from "../schemas";
 
-export const deleteColumn = new Elysia()
-  .use(jwtPlugin)
-  .delete("/:id/columns/:columnId", async ({ params, jwt, headers, set }) => {
+export const deleteColumn = new Elysia().use(jwtPlugin).delete(
+  "/:id/columns/:columnId",
+  async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
       return authResult;
@@ -59,4 +60,17 @@ export const deleteColumn = new Elysia()
         message: "Failed to delete column",
       };
     }
-  });
+  },
+  {
+    response: {
+      200: SuccessMessageResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
+  }
+);

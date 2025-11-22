@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkAdminAccess } from "./helpers";
+import { MemberUpdateResponse, ErrorResponse } from "../schemas";
 
 export const patchMember = new Elysia().use(jwtPlugin).patch(
   "/:id/members/:memberId",
@@ -91,5 +92,15 @@ export const patchMember = new Elysia().use(jwtPlugin).patch(
     body: t.Object({
       role: t.Union([t.Literal("Guest"), t.Literal("Maintainer")]),
     }),
+    response: {
+      200: MemberUpdateResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
   }
 );

@@ -1,7 +1,12 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { openapi } from "@elysiajs/openapi";
 import { prisma } from "./lib/prisma";
 import { routes } from "./routes";
+import {
+  HealthResponse,
+  HealthDbResponse,
+  RootResponse,
+} from "./routes/api/schemas";
 
 const app = new Elysia()
   .use(
@@ -18,6 +23,7 @@ const app = new Elysia()
           { name: "invitation", description: "Project invitation endpoints" },
           { name: "projects", description: "Project management endpoints" },
           { name: "tags", description: "Tag management endpoints" },
+          { name: "health", description: "Health check endpoints" },
         ],
       },
     })
@@ -49,26 +55,57 @@ const app = new Elysia()
   });
 
 // Health check endpoints
-app.get("/health", () => {
-  return { status: "ok", message: "TaskMaster API is running" };
-});
-
-app.get("/health/db", async () => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    return { status: "ok", database: "connected" };
-  } catch (error) {
-    return { status: "error", database: "disconnected" };
+app.get(
+  "/health",
+  () => {
+    return { status: "ok", message: "TaskMaster API is running" };
+  },
+  {
+    response: {
+      200: HealthResponse,
+    },
+    detail: {
+      tags: ["health"],
+    },
   }
-});
+);
+
+app.get(
+  "/health/db",
+  async () => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return { status: "ok", database: "connected" };
+    } catch (error) {
+      return { status: "error", database: "disconnected" };
+    }
+  },
+  {
+    response: {
+      200: HealthDbResponse,
+      500: HealthDbResponse,
+    },
+    detail: {
+      tags: ["health"],
+    },
+  }
+);
 
 // API routes
 app.use(routes);
 
 // Root endpoint
-app.get("/", () => {
-  return { message: "Welcome to TaskMaster API" };
-});
+app.get(
+  "/",
+  () => {
+    return { message: "Welcome to TaskMaster API" };
+  },
+  {
+    response: {
+      200: RootResponse,
+    },
+  }
+);
 
 const port = Number(process.env.PORT) || 3001;
 

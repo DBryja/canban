@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkMaintainerAccess } from "./helpers";
+import { TaskReorderResponse, ErrorResponse } from "../schemas";
 
 export const patchTasksReorder = new Elysia().use(jwtPlugin).patch(
   "/:id/tasks/reorder",
@@ -100,5 +101,15 @@ export const patchTasksReorder = new Elysia().use(jwtPlugin).patch(
         })
       ),
     }),
+    response: {
+      200: TaskReorderResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
   }
 );

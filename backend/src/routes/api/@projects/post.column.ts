@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkMaintainerAccess } from "./helpers";
+import { ColumnCreateResponse, ErrorResponse } from "../schemas";
 
 export const postColumn = new Elysia().use(jwtPlugin).post(
   "/:id/columns",
@@ -103,5 +104,16 @@ export const postColumn = new Elysia().use(jwtPlugin).post(
       tagId: t.String(),
       order: t.Optional(t.Number()),
     }),
+    response: {
+      200: ColumnCreateResponse,
+      400: ErrorResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
   }
 );

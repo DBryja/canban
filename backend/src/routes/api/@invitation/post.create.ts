@@ -4,6 +4,7 @@ import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { randomBytes } from "crypto";
 import { connectQueue, publishEmail } from "../../../lib/queue";
+import { InvitationCreateResponse, ErrorResponse } from "../schemas";
 
 function generateInvitationToken() {
   return randomBytes(32).toString("hex");
@@ -115,5 +116,15 @@ export const postCreate = new Elysia().use(jwtPlugin).post(
       expiresInHours: t.Optional(t.Number({ minimum: 1, maximum: 168 })),
       email: t.Optional(t.String({ format: "email" })),
     }),
+    response: {
+      200: InvitationCreateResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["invitation"],
+    },
   }
 );

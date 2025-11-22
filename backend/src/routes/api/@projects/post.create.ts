@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkAdminAccess } from "./helpers";
+import { ProjectCreateResponse, ErrorResponse } from "../schemas";
 
 export const postCreate = new Elysia().use(jwtPlugin).post(
   "/",
@@ -54,5 +55,14 @@ export const postCreate = new Elysia().use(jwtPlugin).post(
       name: t.String({ minLength: 1 }),
       description: t.Optional(t.String()),
     }),
+    response: {
+      200: ProjectCreateResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
   }
 );

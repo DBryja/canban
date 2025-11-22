@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkMaintainerAccess } from "./helpers";
+import { TaskMoveResponse, ErrorResponse } from "../schemas";
 
 export const patchTasksMove = new Elysia().use(jwtPlugin).patch(
   "/:id/tasks/:taskId/move",
@@ -153,5 +154,16 @@ export const patchTasksMove = new Elysia().use(jwtPlugin).patch(
       toColumnId: t.String(),
       newOrder: t.Number(),
     }),
+    response: {
+      200: TaskMoveResponse,
+      400: ErrorResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
   }
 );

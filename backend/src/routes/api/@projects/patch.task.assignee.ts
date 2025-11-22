@@ -4,6 +4,7 @@ import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkMaintainerAccess, checkProjectAccess } from "./helpers";
 import { connectQueue, publishNotification } from "../../../lib/queue";
+import { TaskAssigneeUpdateResponse, ErrorResponse } from "../schemas";
 
 export const patchTaskAssignee = new Elysia().use(jwtPlugin).patch(
   "/:id/tasks/:taskId/assignee",
@@ -146,5 +147,16 @@ export const patchTaskAssignee = new Elysia().use(jwtPlugin).patch(
     body: t.Object({
       assigneeId: t.Optional(t.String()),
     }),
+    response: {
+      200: TaskAssigneeUpdateResponse,
+      400: ErrorResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
   }
 );

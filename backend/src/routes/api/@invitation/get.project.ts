@@ -2,10 +2,11 @@ import { Elysia } from "elysia";
 import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
+import { InvitationsListResponse, ErrorResponse } from "../schemas";
 
-export const getProject = new Elysia()
-  .use(jwtPlugin)
-  .get("/project/:projectId", async ({ params, jwt, headers, set }) => {
+export const getProject = new Elysia().use(jwtPlugin).get(
+  "/project/:projectId",
+  async ({ params, jwt, headers, set }) => {
     const authResult = await requireAuth(jwt, headers, set);
     if ("error" in authResult) {
       return authResult;
@@ -58,7 +59,11 @@ export const getProject = new Elysia()
         invitations: invitations.map((inv) => ({
           id: inv.id,
           token: inv.token,
-          project: inv.project,
+          project: {
+            id: inv.project.id,
+            name: inv.project.name,
+            description: null,
+          },
           role: inv.role,
           expiresAt: inv.expiresAt,
           used: inv.used,
@@ -73,4 +78,17 @@ export const getProject = new Elysia()
         message: "Failed to fetch invitations",
       };
     }
-  });
+  },
+  {
+    response: {
+      200: InvitationsListResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["invitation"],
+    },
+  }
+);

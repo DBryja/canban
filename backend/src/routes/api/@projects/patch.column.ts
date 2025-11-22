@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { jwtPlugin } from "../../../lib/jwt";
 import { requireAuth } from "../../../middleware/auth";
 import { checkMaintainerAccess } from "./helpers";
+import { ColumnUpdateResponse, ErrorResponse } from "../schemas";
 
 export const patchColumn = new Elysia().use(jwtPlugin).patch(
   "/:id/columns/:columnId",
@@ -79,5 +80,15 @@ export const patchColumn = new Elysia().use(jwtPlugin).patch(
       order: t.Optional(t.Number()),
       tagId: t.Optional(t.String()),
     }),
+    response: {
+      200: ColumnUpdateResponse,
+      401: ErrorResponse,
+      403: ErrorResponse,
+      404: ErrorResponse,
+      500: ErrorResponse,
+    },
+    detail: {
+      tags: ["projects"],
+    },
   }
 );
