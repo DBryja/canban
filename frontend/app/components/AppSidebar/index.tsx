@@ -40,7 +40,7 @@ function AppSidebarRoot({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar collapsible="none" className="md:flex" {...props}>
+    <Sidebar collapsible="none" className="md:flex w-full" {...props}>
       {children}
     </Sidebar>
   );
@@ -414,13 +414,13 @@ function AppSidebarUserProfile() {
 }
 
 // Default composed sidebar - ready to use
-function AppSidebarDefault() {
+function AppSidebarDefault({ className }: { className?: string }) {
   const { user } = useAuth();
 
   if (!user) return null;
 
   return (
-    <AppSidebarRoot>
+    <AppSidebarRoot className={className}>
       <AppSidebarContent>
         <AppSidebarHomeButton />
         <AppSidebarProjectGroup />
